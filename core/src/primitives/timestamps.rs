@@ -1,36 +1,36 @@
 use pancake_db_idl::dml::field_value::Value;
 use pancake_db_idl::dtype::DataType;
 use protobuf::well_known_types::Timestamp;
-use q_compress::TimestampNs;
+use q_compress::TimestampMicros;
 use q_compress::types::NumberLike;
 
 use crate::compression::Codec;
-use crate::compression::q_codec::TimestampNsQCodec;
+use crate::compression::q_codec::TimestampMicrosQCodec;
 use crate::compression::Q_COMPRESS;
 use crate::errors::{CoreError, CoreResult};
 use crate::primitives::{Atom, Primitive};
 
-impl Atom for TimestampNs {
+impl Atom for TimestampMicros {
   const BYTE_SIZE: usize = 12;
 
   fn to_bytes(&self) -> Vec<u8> {
-    TimestampNs::bytes_from(*self)
+    TimestampMicros::bytes_from(*self)
   }
 
   fn try_from_bytes(bytes: &[u8]) -> CoreResult<Self> {
-    Ok(TimestampNs::from_bytes_safe(bytes)?)
+    Ok(TimestampMicros::from_bytes_safe(bytes)?)
   }
 }
 
-impl Primitive for TimestampNs {
-  const DTYPE: DataType = DataType::TIMESTAMP_NS;
+impl Primitive for TimestampMicros {
+  const DTYPE: DataType = DataType::TIMESTAMP_MICROS;
   const IS_ATOMIC: bool = true;
 
   type A = Self;
 
-  fn try_from_value(v: &Value) -> CoreResult<TimestampNs> {
+  fn try_from_value(v: &Value) -> CoreResult<TimestampMicros> {
     match v {
-      Value::timestamp_val(res) => Ok(TimestampNs::from_secs_and_nanos(res.seconds, res.nanos as u32)),
+      Value::timestamp_val(res) => Ok(TimestampMicros::from_secs_and_nanos(res.seconds, res.nanos as u32)),
       _ => Err(CoreError::invalid("cannot read timestamp from value")),
     }
   }
@@ -53,7 +53,7 @@ impl Primitive for TimestampNs {
 
   fn new_codec(codec: &str) -> Option<Box<dyn Codec<P=Self>>> {
     if codec == Q_COMPRESS {
-      Some(Box::new(TimestampNsQCodec {}))
+      Some(Box::new(TimestampMicrosQCodec {}))
     } else {
       None
     }

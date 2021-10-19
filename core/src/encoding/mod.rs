@@ -1,6 +1,6 @@
 use pancake_db_idl::dml::FieldValue;
 use pancake_db_idl::dtype::DataType;
-use q_compress::TimestampNs;
+use q_compress::TimestampMicros;
 
 pub use decoder::ByteIdx;
 pub use decoder::Decodable;
@@ -38,7 +38,7 @@ pub fn new_encoder(dtype: DataType, nested_list_depth: u8) -> Box<dyn Encoder> {
     DataType::FLOAT64 => encoder_for::<f64>(nested_list_depth),
     DataType::BYTES => encoder_for::<Vec<u8>>(nested_list_depth),
     DataType::BOOL => encoder_for::<bool>(nested_list_depth),
-    DataType::TIMESTAMP_NS => encoder_for::<TimestampNs>(nested_list_depth),
+    DataType::TIMESTAMP_MICROS => encoder_for::<TimestampMicros>(nested_list_depth),
   }
 }
 
@@ -49,7 +49,7 @@ pub fn new_field_value_decoder(dtype: DataType, nested_list_depth: u8) -> Box<dy
     DataType::FLOAT64 => field_value_decoder_for::<f64>(nested_list_depth),
     DataType::BYTES => field_value_decoder_for::<Vec<u8>>(nested_list_depth),
     DataType::BOOL => field_value_decoder_for::<bool>(nested_list_depth),
-    DataType::TIMESTAMP_NS => field_value_decoder_for::<TimestampNs>(nested_list_depth),
+    DataType::TIMESTAMP_MICROS => field_value_decoder_for::<TimestampMicros>(nested_list_depth),
   }
 }
 
@@ -60,7 +60,7 @@ pub fn new_byte_idx_decoder(dtype: DataType, nested_list_depth: u8) -> Box<dyn D
     DataType::FLOAT64 => byte_idx_decoder_for::<f64>(nested_list_depth),
     DataType::BYTES => byte_idx_decoder_for::<Vec<u8>>(nested_list_depth),
     DataType::BOOL => byte_idx_decoder_for::<bool>(nested_list_depth),
-    DataType::TIMESTAMP_NS => byte_idx_decoder_for::<TimestampNs>(nested_list_depth),
+    DataType::TIMESTAMP_MICROS => byte_idx_decoder_for::<TimestampMicros>(nested_list_depth),
   }
 }
 

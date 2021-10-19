@@ -1,5 +1,5 @@
 use pancake_db_idl::dtype::DataType;
-use q_compress::TimestampNs;
+use q_compress::TimestampMicros;
 
 use crate::errors::{CoreError, CoreResult};
 use crate::primitives::Primitive;
@@ -17,7 +17,7 @@ pub fn new_codec(
     DataType::BYTES => Vec::<u8>::new_value_codec(codec),
     DataType::BOOL => bool::new_value_codec(codec),
     DataType::FLOAT64 => f64::new_value_codec(codec),
-    DataType::TIMESTAMP_NS => TimestampNs::new_value_codec(codec),
+    DataType::TIMESTAMP_MICROS => TimestampMicros::new_value_codec(codec),
   };
 
   match maybe_res {
@@ -37,7 +37,7 @@ pub fn choose_codec(dtype: DataType) -> String {
     DataType::BYTES => ZSTD.to_string(),
     DataType::FLOAT64 => Q_COMPRESS.to_string(),
     DataType::BOOL => Q_COMPRESS.to_string(),
-    DataType::TIMESTAMP_NS => Q_COMPRESS.to_string(),
+    DataType::TIMESTAMP_MICROS => Q_COMPRESS.to_string(),
   }
 }
 
