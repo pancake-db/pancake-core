@@ -1,12 +1,18 @@
 [package]
 name = "pancake-db-client"
 version = "0.0.0-alpha.0"
-authors = ["mwlon <m.w.loncaric@gmail.com>"]
 edition = "2018"
+
+authors = ["PancakeDB <inquiries@pancakedb.com>"]
+categories = ["Database interfaces"]
+description = "Rust client library for PancakeDB"
+keywords = ["pancake", "db", "client"]
+license = "Apache-2.0"
+repository = "https://github.com/pancake-db/pancake-core/"
 
 [dependencies]
 hyper = {version="0.14.9", features=["full"]}
-pancake-db-core = {path="../core", version="0.0.0-alpha.0"}
+pancake-db-core = "0.0.0-alpha.0"
 pancake-db-idl = "0.0.0-alpha.0"
 protobuf = "3.0.0-alpha.1"
 tokio = {version="1.2.0", features=["macros"]}

@@ -4,8 +4,8 @@ version = "0.0.0-alpha.0"
 edition = "2018"
 
 authors = ["PancakeDB <inquiries@pancakedb.com>"]
-description = "API specification for PancakeDB"
-keywords = ["pancake", "core"]
+description = "Tools for PancakeDB and its client libraries"
+keywords = ["pancake", "db", "core"]
 license = "Apache-2.0"
 repository = "https://github.com/pancake-db/pancake-core/"
 

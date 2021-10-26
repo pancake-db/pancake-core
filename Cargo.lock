@@ -295,7 +295,7 @@ name = "pancake-db-client"
 version = "0.0.0-alpha.0"
 dependencies = [
  "hyper",
- "pancake-db-core",
+ "pancake-db-core 0.0.0-alpha.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pancake-db-idl",
  "protobuf",
  "tokio",
@@ -304,6 +304,18 @@ dependencies = [
 [[package]]
 name = "pancake-db-core"
 version = "0.0.0-alpha.0"
+dependencies = [
+ "pancake-db-idl",
+ "protobuf",
+ "q_compress",
+ "zstd",
+]
+
+[[package]]
+name = "pancake-db-core"
+version = "0.0.0-alpha.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3785eb824038ddaf4fe126d6f298b83883cc4818438818460532fb69118a6baf"
 dependencies = [
  "pancake-db-idl",
  "protobuf",

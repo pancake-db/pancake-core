@@ -14,7 +14,7 @@ use tokio;
 use pancake_db_client::Client;
 use pancake_db_client::errors::ClientResult;
 
-const TABLE_NAME: &str = "t";
+const TABLE_NAME: &str = "client_runthrough_table";
 
 #[tokio::main]
 async fn main() -> ClientResult<()> {
