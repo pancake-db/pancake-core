@@ -1,11 +1,16 @@
 [package]
 name = "pancake-db-core"
-version = "0.0.0"
-authors = ["mwlon <m.w.loncaric@gmail.com>"]
+version = "0.0.0-alpha.0"
 edition = "2018"
 
+authors = ["PancakeDB <inquiries@pancakedb.com>"]
+description = "API specification for PancakeDB"
+keywords = ["pancake", "core"]
+license = "Apache-2.0"
+repository = "https://github.com/pancake-db/pancake-core/"
+
 [dependencies]
-pancake-db-idl = {path= "../../pancake-idl/rust"}
-protobuf = {git="https://github.com/stepancheg/rust-protobuf", rev="b3fe22932968995779e4046189becdf7be82ba1d"}
-q_compress = {path="../../../opensource/quantile-compression"}
+pancake-db-idl = "0.0.0-alpha.0"
+protobuf = "3.0.0-alpha.1"
+q_compress = "0.3.1"
 zstd = "0.9"

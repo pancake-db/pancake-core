@@ -3,6 +3,7 @@ use crate::errors::{CoreError, CoreResult};
 use super::{NULL_BYTE, ESCAPE_BYTE};
 use std::fmt::{Formatter, Debug};
 
+#[derive(Clone)]
 pub struct ByteReader<'a> {
   bytes: &'a [u8],
   i: usize,

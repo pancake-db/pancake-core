@@ -7,7 +7,7 @@ use crate::primitives::{Atom, Primitive};
 
 const REPETITION_LEVEL_Q_COMPRESSION_LEVEL: u32 = 6;
 
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RepLevelsAndAtoms<A: Atom> {
   pub levels: Vec<u8>,
   pub atoms: Vec<A>,
@@ -20,6 +20,7 @@ impl<A: Atom> RepLevelsAndAtoms<A> {
   }
 }
 
+#[derive(Clone, Debug)]
 pub struct RepLevelsAndBytes {
   pub levels: Vec<u8>,
   pub remaining_bytes: Vec<u8>,
@@ -140,12 +141,14 @@ impl<P: Primitive> AtomNester<P> {
     } else if traverse_depth < self.schema_depth {
       //list
       let mut res = Vec::new();
-      while level != traverse_depth + 1 {
+      while level > traverse_depth + 1 {
         res.push(self.nested_field_value(traverse_depth + 1)?);
         level = self.rep_levels[self.i];
       }
 
-      self.i += 1;
+      if level == traverse_depth + 1 {
+        self.i += 1;
+      }
       Ok(FieldValue {
         value: Some(Value::list_val(RepeatedFieldValue {
           vals: res,
@@ -159,8 +162,7 @@ impl<P: Primitive> AtomNester<P> {
         self.i += 1;
         self.j += 1;
       } else {
-        while level != self.schema_depth + 1 {
-          // maybe we should check level == schema_depth + 2
+        while level == self.schema_depth + 2 {
           self.i += 1;
           self.j += 1;
           level = self.rep_levels[self.i];

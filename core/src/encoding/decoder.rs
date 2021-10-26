@@ -113,6 +113,7 @@ pub trait Decoder<Output> {
   }
 }
 
+#[derive(Clone, Debug)]
 pub struct DecoderImpl<P: Primitive, H> where H: Decodable<P> {
   nested_list_depth: u8,
   _phantom_p: PhantomData<P>,

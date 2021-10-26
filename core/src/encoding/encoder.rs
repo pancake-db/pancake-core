@@ -11,6 +11,7 @@ pub trait Encoder: Send + Sync {
   fn encode(&self, values: &[FieldValue]) -> CoreResult<Vec<u8>>;
 }
 
+#[derive(Clone, Debug)]
 pub struct EncoderImpl<P: Primitive> {
   nested_list_depth: u8,
   _phantom: PhantomData<P>,
