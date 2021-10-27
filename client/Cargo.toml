@@ -4,7 +4,7 @@ version = "0.0.0-alpha.0"
 edition = "2018"
 
 authors = ["PancakeDB <inquiries@pancakedb.com>"]
-categories = ["Database interfaces"]
+categories = ["database"]
 description = "Rust client library for PancakeDB"
 keywords = ["pancake", "db", "client"]
 license = "Apache-2.0"
