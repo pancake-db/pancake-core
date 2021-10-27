@@ -39,7 +39,6 @@ impl Client {
       continuation_token = resp.continuation_token;
       initial_request = false;
     }
-    println!("READ IN {} compressed {} uncompressed for {}", compressed_bytes.len(), uncompressed_bytes.len(), column.name);
 
     let mut res = Vec::new();
 

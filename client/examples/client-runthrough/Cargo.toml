@@ -5,7 +5,8 @@ authors = ["mwlon <m.w.loncaric@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-pancake-db-client = {path="../../client"}
+futures = "0.3.17"
+pancake-db-client = {path= "../.." }
 pancake-db-idl = "0.0.0-alpha.0"
 protobuf = "3.0.0-alpha.1"
 tokio = {version="1.2.0", features=["full"]}

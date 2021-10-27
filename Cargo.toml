@@ -3,5 +3,5 @@
 members = [
     "core",
     "client",
-    "examples/client-runthrough"
+    "client/examples/client-runthrough"
 ]
