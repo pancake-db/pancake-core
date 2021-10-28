@@ -17,7 +17,7 @@ Each of these calls simply sends a request to the server and
 translates the response into a `ClientResult<>` of the corresponding
 response struct.
 For details about the API calls and what all their fields mean,
-see the [API docs]().
+see the [API docs](https://github.com/pancake-db/pancake-idl).
 
 ### Create Table
 ```
@@ -30,7 +30,7 @@ pub async fn api_create_table(&self, req: &CreateTableRequest) -> ClientResult<C
 ```
 use pancake_db_idl::ddl::{DropTableRequest, DropTableResponse};
 // invoke this client method:
-pub async fn api_drop_table(&self, req: &DropTableRequest) -> ClientResult<DropTableResponse> {
+pub async fn api_drop_table(&self, req: &DropTableRequest) -> ClientResult<DropTableResponse>
 ```
 
 ### List Segments
