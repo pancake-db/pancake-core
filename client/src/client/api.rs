@@ -1,6 +1,6 @@
 use hyper::{Body, Method, Request, StatusCode};
 use hyper::body::HttpBody;
-use pancake_db_idl::ddl::{CreateTableRequest, CreateTableResponse};
+use pancake_db_idl::ddl::{CreateTableRequest, CreateTableResponse, GetSchemaRequest, GetSchemaResponse};
 use pancake_db_idl::ddl::{DropTableRequest, DropTableResponse};
 use pancake_db_idl::dml::{WriteToPartitionRequest, WriteToPartitionResponse};
 use pancake_db_idl::dml::{ListSegmentsRequest, ListSegmentsResponse};
@@ -49,6 +49,14 @@ impl Client {
     self.simple_json_request::<DropTableRequest, DropTableResponse>(
       "drop_table",
       Method::POST,
+      req,
+    ).await
+  }
+
+  pub async fn api_get_schema(&self, req: &GetSchemaRequest) -> ClientResult<GetSchemaResponse> {
+    self.simple_json_request::<GetSchemaRequest, GetSchemaResponse>(
+      "get_schema",
+      Method::GET,
       req,
     ).await
   }

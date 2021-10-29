@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 
 use futures::StreamExt;
-use pancake_db_idl::ddl::{CreateTableRequest, DropTableRequest};
+use pancake_db_idl::ddl::{CreateTableRequest, DropTableRequest, GetSchemaRequest};
 use pancake_db_idl::dml::{Field, FieldValue, ListSegmentsRequest, PartitionField, RepeatedFieldValue, Row, WriteToPartitionRequest};
 use pancake_db_idl::dml::field_value::Value;
 use pancake_db_idl::dtype::DataType;
@@ -47,6 +47,13 @@ async fn main() -> ClientResult<()> {
   };
   let create_resp = client.api_create_table(&create_table_req).await?;
   println!("Created table: {:?}", create_resp);
+
+  let get_schema_req = GetSchemaRequest {
+    table_name: TABLE_NAME.to_string(),
+    ..Default::default()
+  };
+  let get_schema_resp = client.api_get_schema(&get_schema_req).await?;
+  println!("Got schema: {:?}", get_schema_resp);
 
   // Write rows
   // you can put up to 256 rows into one request for efficiency,

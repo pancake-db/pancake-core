@@ -40,6 +40,14 @@ use pancake_db_idl::dml::{ListSegmentsRequest, ListSegmentsResponse};
 pub async fn api_list_segments(&self, req: &ListSegmentsRequest) -> ClientResult<ListSegmentsResponse>
 ```
 
+### Get Schema
+```
+use pancake_db_idl::dml::{GetSchemaRequest, GetSchemaResponse};
+// invoke this client method:
+pub async fn api_get_schema(&self, req: &GetSchemaRequest) -> ClientResult<GetSchemaResponse>
+```
+
+
 ### Write to Partition
 ```
 use pancake_db_idl::dml::{WriteToPartitionRequest, WriteToPartitionResponse};
