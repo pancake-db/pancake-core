@@ -5,6 +5,7 @@ edition = "2018"
 
 authors = ["PancakeDB <inquiries@pancakedb.com>"]
 description = "Tools for PancakeDB and its client libraries"
+homepage = "https://pancakedb.com"
 keywords = ["pancake", "db", "core"]
 license = "Apache-2.0"
 repository = "https://github.com/pancake-db/pancake-core/"

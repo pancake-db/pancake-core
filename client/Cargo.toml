@@ -6,6 +6,7 @@ edition = "2018"
 authors = ["PancakeDB <inquiries@pancakedb.com>"]
 categories = ["database"]
 description = "Rust client library for PancakeDB"
+homepage = "https://pancakedb.com"
 keywords = ["pancake", "db", "client"]
 license = "Apache-2.0"
 repository = "https://github.com/pancake-db/pancake-core/"
