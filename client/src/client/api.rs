@@ -1,6 +1,6 @@
 use hyper::{Body, Method, Request, StatusCode};
 use hyper::body::HttpBody;
-use pancake_db_idl::ddl::{CreateTableRequest, CreateTableResponse, GetSchemaRequest, GetSchemaResponse};
+use pancake_db_idl::ddl::{CreateTableRequest, CreateTableResponse, GetSchemaRequest, GetSchemaResponse, AlterTableResponse, AlterTableRequest};
 use pancake_db_idl::ddl::{DropTableRequest, DropTableResponse};
 use pancake_db_idl::dml::{WriteToPartitionRequest, WriteToPartitionResponse};
 use pancake_db_idl::dml::{ListSegmentsRequest, ListSegmentsResponse};
@@ -40,6 +40,14 @@ impl Client {
   pub async fn api_create_table(&self, req: &CreateTableRequest) -> ClientResult<CreateTableResponse> {
     self.simple_json_request::<CreateTableRequest, CreateTableResponse>(
       "create_table",
+      Method::POST,
+      req,
+    ).await
+  }
+
+  pub async fn api_alter_table(&self, req: &AlterTableRequest) -> ClientResult<AlterTableResponse> {
+    self.simple_json_request::<AlterTableRequest, AlterTableResponse>(
+      "alter_table",
       Method::POST,
       req,
     ).await

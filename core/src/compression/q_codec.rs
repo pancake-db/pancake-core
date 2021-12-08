@@ -41,5 +41,6 @@ macro_rules! qcompressor {
 
 qcompressor!(I64QCodec, i64);
 qcompressor!(BoolQCodec, bool);
+qcompressor!(F32QCodec, f32);
 qcompressor!(F64QCodec, f64);
 qcompressor!(TimestampMicrosQCodec, TimestampMicros);

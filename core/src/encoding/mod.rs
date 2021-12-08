@@ -35,6 +35,7 @@ pub fn new_encoder(dtype: DataType, nested_list_depth: u8) -> Box<dyn Encoder> {
   match dtype {
     DataType::INT64 => encoder_for::<i64>(nested_list_depth),
     DataType::STRING => encoder_for::<String>(nested_list_depth),
+    DataType::FLOAT32 => encoder_for::<f32>(nested_list_depth),
     DataType::FLOAT64 => encoder_for::<f64>(nested_list_depth),
     DataType::BYTES => encoder_for::<Vec<u8>>(nested_list_depth),
     DataType::BOOL => encoder_for::<bool>(nested_list_depth),
@@ -46,6 +47,7 @@ pub fn new_field_value_decoder(dtype: DataType, nested_list_depth: u8) -> Box<dy
   match dtype {
     DataType::INT64 => field_value_decoder_for::<i64>(nested_list_depth),
     DataType::STRING => field_value_decoder_for::<String>(nested_list_depth),
+    DataType::FLOAT32 => field_value_decoder_for::<f32>(nested_list_depth),
     DataType::FLOAT64 => field_value_decoder_for::<f64>(nested_list_depth),
     DataType::BYTES => field_value_decoder_for::<Vec<u8>>(nested_list_depth),
     DataType::BOOL => field_value_decoder_for::<bool>(nested_list_depth),
@@ -57,6 +59,7 @@ pub fn new_byte_idx_decoder(dtype: DataType, nested_list_depth: u8) -> Box<dyn D
   match dtype {
     DataType::INT64 => byte_idx_decoder_for::<i64>(nested_list_depth),
     DataType::STRING => byte_idx_decoder_for::<String>(nested_list_depth),
+    DataType::FLOAT32 => byte_idx_decoder_for::<f32>(nested_list_depth),
     DataType::FLOAT64 => byte_idx_decoder_for::<f64>(nested_list_depth),
     DataType::BYTES => byte_idx_decoder_for::<Vec<u8>>(nested_list_depth),
     DataType::BOOL => byte_idx_decoder_for::<bool>(nested_list_depth),
