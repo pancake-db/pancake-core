@@ -30,7 +30,7 @@ impl Display for ClientErrorKind {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     let s = match &self {
       ClientErrorKind::Http(status) => format!("HTTP error {}", status),
-      ClientErrorKind::Other => format!("client-side error"),
+      ClientErrorKind::Other => "client-side error".to_string(),
     };
     f.write_str(&s)
   }

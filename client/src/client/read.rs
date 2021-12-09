@@ -1,19 +1,21 @@
-use pancake_db_idl::dml::{PartitionField, Row, ReadSegmentColumnRequest, FieldValue, Field};
+use pancake_db_idl::dml::{FieldValue, PartitionFieldValue, ReadSegmentColumnRequest, Row};
+use pancake_db_idl::schema::ColumnMeta;
+
 use pancake_db_core::compression;
 use pancake_db_core::encoding;
 
-use crate::errors::{ClientResult, ClientError};
+use crate::errors::{ClientError, ClientResult};
 
 use super::Client;
-use pancake_db_idl::schema::ColumnMeta;
-use protobuf::MessageField;
+use std::collections::HashMap;
 
 impl Client {
   pub async fn decode_segment_column(
     &self,
     table_name: &str,
-    partition: &[PartitionField],
+    partition: &HashMap<String, PartitionFieldValue>,
     segment_id: &str,
+    column_name: &str,
     column: &ColumnMeta,
   ) -> ClientResult<Vec<FieldValue>> {
     let mut initial_request = true;
@@ -25,9 +27,9 @@ impl Client {
     while initial_request || !continuation_token.is_empty() {
       let req = ReadSegmentColumnRequest {
         table_name: table_name.to_string(),
-        partition: partition.to_vec(),
+        partition: partition.clone(),
         segment_id: segment_id.to_string(),
-        column_name: column.name.clone(),
+        column_name: column_name.to_string(),
         continuation_token,
         ..Default::default()
       };
@@ -48,9 +50,9 @@ impl Client {
     let dtype = column.dtype.enum_value_or_default();
     if !compressed_bytes.is_empty() {
       if implicit_nulls_count > 0 {
-        return Err(ClientError::other(format!(
-          "contradictory read responses containing both compacted and implicit data received"
-        )));
+        return Err(ClientError::other(
+          "contradictory read responses containing both compacted and implicit data received".to_string()
+        ));
       }
 
       let decompressor = compression::new_codec(
@@ -81,9 +83,9 @@ impl Client {
   pub async fn decode_segment(
     &self,
     table_name: &str,
-    partition: &[PartitionField],
+    partition: &HashMap<String, PartitionFieldValue>,
     segment_id: &str,
-    columns: &[ColumnMeta],
+    columns: &HashMap<String, ColumnMeta>,
   ) -> ClientResult<Vec<Row>> {
     if columns.is_empty() {
       return Err(ClientError::other(
@@ -92,30 +94,24 @@ impl Client {
     }
 
     let mut n = usize::MAX;
-    let mut column_fvalues = Vec::new();
-    for column in columns {
+    let mut rows = Vec::new();
+    for (column_name, column_meta) in columns {
       let fvalues = self.decode_segment_column(
         table_name,
         partition,
         segment_id,
-        column
+        column_name,
+        column_meta,
       ).await?;
       n = n.min(fvalues.len());
-      column_fvalues.push(fvalues);
+      for _ in rows.len()..n {
+        rows.push(Row::new());
+      }
+      for i in 0..n {
+        rows[i].fields.insert(column_name.clone(), fvalues[i].clone());
+      }
     }
 
-    let mut rows = Vec::with_capacity(n);
-    for row_idx in 0..n {
-      let mut row = Row::new();
-      for col_idx in 0..column_fvalues.len() {
-        row.fields.push(Field {
-          name: columns[col_idx].name.clone(),
-          value: MessageField::some(column_fvalues[col_idx][row_idx].clone()),
-          ..Default::default()
-        });
-      }
-      rows.push(row);
-    }
     Ok(rows)
   }
 }
