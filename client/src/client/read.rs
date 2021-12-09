@@ -32,11 +32,12 @@ impl Client {
         ..Default::default()
       };
       let resp = self.api_read_segment_column(&req).await?;
-      if !resp.codec.is_empty() {
+      if resp.codec.is_empty() {
+        uncompressed_bytes.extend(&resp.data);
+      } else {
+        compressed_bytes.extend(&resp.data);
         codec = resp.codec.clone();
       }
-      compressed_bytes.extend(&resp.compressed_data);
-      uncompressed_bytes.extend(&resp.uncompressed_data);
       continuation_token = resp.continuation_token;
       implicit_nulls_count = resp.implicit_nulls_count;
       initial_request = false;

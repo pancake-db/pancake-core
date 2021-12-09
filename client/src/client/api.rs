@@ -26,14 +26,8 @@ fn parse_read_segment_response(bytes: Vec<u8>) -> ClientResult<ReadSegmentColumn
   let content_str = String::from_utf8(bytes[0..i + 1].to_vec())?;
   let mut res = ReadSegmentColumnResponse::new();
   protobuf::json::merge_from_str(&mut res, &content_str)?;
-  let rest = bytes[i + delim_bytes.len()..].to_vec();
-  if res.codec.is_empty() {
-    res.uncompressed_data = rest;
-  } else {
-    res.compressed_data = rest;
-  }
+  res.data = bytes[i + delim_bytes.len()..].to_vec();
   Ok(res)
-
 }
 
 impl Client {
