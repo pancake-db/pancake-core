@@ -5,10 +5,11 @@ use pancake_db_idl::dml::field_value::Value;
 
 use crate::errors::{CoreResult, CoreError};
 use crate::primitives::{Atom, Primitive};
-use super::{NULL_BYTE, ESCAPE_BYTE};
+use super::{NULL_BYTE, ESCAPE_BYTE, COUNT_BYTE};
 
 pub trait Encoder: Send + Sync {
   fn encode(&self, values: &[FieldValue]) -> CoreResult<Vec<u8>>;
+  fn encode_count(&self, count: u32) -> Vec<u8>;
 }
 
 #[derive(Clone, Debug)]
@@ -52,6 +53,12 @@ impl<P: Primitive> Encoder for EncoderImpl<P> {
       maybe_err?;
     }
     Ok(res)
+  }
+
+  fn encode_count(&self, count: u32) -> Vec<u8> {
+    let mut res = vec![COUNT_BYTE];
+    res.extend(&escape_bytes(&count.to_be_bytes()));
+    res
   }
 }
 

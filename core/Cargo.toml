@@ -1,6 +1,6 @@
 [package]
 name = "pancake-db-core"
-version = "0.0.0-alpha.0"
+version = "0.0.0-alpha.1"
 edition = "2018"
 
 authors = ["PancakeDB <inquiries@pancakedb.com>"]
@@ -11,7 +11,7 @@ license = "Apache-2.0"
 repository = "https://github.com/pancake-db/pancake-core/"
 
 [dependencies]
-pancake-db-idl = "0.0.0-alpha.0"
-protobuf = "3.0.0-alpha.1"
+pancake-db-idl = {path="../../pancake-idl/rust"}
+protobuf = "=3.0.0-alpha.2"
 q_compress = "0.3.1"
 zstd = "0.9"

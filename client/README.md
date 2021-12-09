@@ -14,7 +14,7 @@ let client = Client::from_ip_port(
 );
 ```
 
-For a detailed example, see [the client runthrough](./examples/client-runthrough/src/main.rs).
+For a detailed example, see [the client runthrough](examples/runthrough).
 
 # Essential API
 

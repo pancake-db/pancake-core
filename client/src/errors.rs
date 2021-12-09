@@ -22,14 +22,14 @@ pub struct ClientError {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ClientErrorKind {
-  Http { status: StatusCode },
+  Http(StatusCode),
   Other,
 }
 
 impl Display for ClientErrorKind {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     let s = match &self {
-      ClientErrorKind::Http {status} => format!("HTTP error {}", status),
+      ClientErrorKind::Http(status) => format!("HTTP error {}", status),
       ClientErrorKind::Other => format!("client-side error"),
     };
     f.write_str(&s)
@@ -40,7 +40,7 @@ impl ClientError {
   pub fn http(status: StatusCode, message: &str) -> Self {
     ClientError {
       message: message.to_string(),
-      kind: ClientErrorKind::Http {status}
+      kind: ClientErrorKind::Http(status)
     }
   }
 

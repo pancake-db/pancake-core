@@ -71,15 +71,6 @@ impl<'a> ByteReader<'a> {
     Ok(byte0 as u16 * 256 + byte1 as u16)
   }
 
-  pub fn read_n(&mut self, n: usize) -> CoreResult<&'a [u8]> {
-    if self.i + n >= self.bytes.len() {
-      return Err(CoreError::corrupt("read_n out of bytes"));
-    }
-    let res = &self.bytes[self.i..self.i+n];
-    self.i += n;
-    Ok(res)
-  }
-
   pub fn get_byte_idx(&self) -> usize {
     self.i
   }

@@ -21,6 +21,7 @@ impl Client {
     let mut compressed_bytes = Vec::new();
     let mut uncompressed_bytes = Vec::new();
     let mut codec = "".to_string();
+    let mut implicit_nulls_count = 0;
     while initial_request || !continuation_token.is_empty() {
       let req = ReadSegmentColumnRequest {
         table_name: table_name.to_string(),
@@ -37,6 +38,7 @@ impl Client {
       compressed_bytes.extend(&resp.compressed_data);
       uncompressed_bytes.extend(&resp.uncompressed_data);
       continuation_token = resp.continuation_token;
+      implicit_nulls_count = resp.implicit_nulls_count;
       initial_request = false;
     }
 
@@ -44,6 +46,12 @@ impl Client {
 
     let dtype = column.dtype.enum_value_or_default();
     if !compressed_bytes.is_empty() {
+      if implicit_nulls_count > 0 {
+        return Err(ClientError::other(format!(
+          "contradictory read responses containing both compacted and implicit data received"
+        )));
+      }
+
       let decompressor = compression::new_codec(
         dtype,
         &codec,
@@ -52,6 +60,10 @@ impl Client {
         compressed_bytes,
         column.nested_list_depth as u8,
       )?);
+    }
+
+    for _ in 0..implicit_nulls_count {
+      res.push(FieldValue::new());
     }
 
     if !uncompressed_bytes.is_empty() {

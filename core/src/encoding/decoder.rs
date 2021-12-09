@@ -133,7 +133,7 @@ impl<P: Primitive, H> Decoder<H> for DecoderImpl<P, H> where H: Decodable<P> {
       if b0 == NULL_BYTE {
         res.push(H::handle_null(reader.get_byte_idx()));
       } else if b0 == COUNT_BYTE {
-        let count_bytes = utils::try_byte_array::<4>(reader.read_n(4)?)?;
+        let count_bytes = utils::try_byte_array::<4>(&reader.unescaped_read_n(4)?)?;
         let count = u32::from_be_bytes(count_bytes) as usize;
         if res.is_empty() {
           for _ in 0..count {

@@ -16,6 +16,7 @@ pub fn new_codec(
     DataType::INT64 => i64::new_value_codec(codec),
     DataType::BYTES => Vec::<u8>::new_value_codec(codec),
     DataType::BOOL => bool::new_value_codec(codec),
+    DataType::FLOAT32 => f32::new_value_codec(codec),
     DataType::FLOAT64 => f64::new_value_codec(codec),
     DataType::TIMESTAMP_MICROS => TimestampMicros::new_value_codec(codec),
   };
@@ -35,6 +36,7 @@ pub fn choose_codec(dtype: DataType) -> String {
     DataType::INT64 => Q_COMPRESS.to_string(),
     DataType::STRING => ZSTD.to_string(),
     DataType::BYTES => ZSTD.to_string(),
+    DataType::FLOAT32 => Q_COMPRESS.to_string(),
     DataType::FLOAT64 => Q_COMPRESS.to_string(),
     DataType::BOOL => Q_COMPRESS.to_string(),
     DataType::TIMESTAMP_MICROS => Q_COMPRESS.to_string(),
