@@ -2,7 +2,7 @@ use std::net::{IpAddr, Ipv4Addr};
 
 use futures::StreamExt;
 use pancake_db_idl::ddl::{CreateTableRequest, DropTableRequest, GetSchemaRequest};
-use pancake_db_idl::dml::{Field, FieldValue, ListSegmentsRequest, PartitionField, RepeatedFieldValue, Row, WriteToPartitionRequest};
+use pancake_db_idl::dml::{ListSegmentsRequest, FieldValue, RepeatedFieldValue, Row, WriteToPartitionRequest};
 use pancake_db_idl::dml::field_value::Value;
 use pancake_db_idl::dtype::DataType;
 use pancake_db_idl::schema::{ColumnMeta, Schema};
@@ -11,6 +11,7 @@ use tokio;
 
 use pancake_db_client::Client;
 use pancake_db_client::errors::ClientResult;
+use std::collections::HashMap;
 
 const TABLE_NAME: &str = "client_runthrough_table";
 
@@ -24,23 +25,21 @@ async fn main() -> ClientResult<()> {
 
   // Create a table
   let i_meta = ColumnMeta {
-    name: "i".to_string(),
     dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
     ..Default::default()
   };
   let s_meta = ColumnMeta {
-    name: "s".to_string(),
     dtype: ProtobufEnumOrUnknown::new(DataType::STRING),
     nested_list_depth: 1,
     ..Default::default()
   };
+  let mut columns = HashMap::new();
+  columns.insert("i".to_string(), i_meta);
+  columns.insert("s".to_string(), s_meta);
   let create_table_req = CreateTableRequest {
     table_name: TABLE_NAME.to_string(),
     schema: MessageField::some(Schema {
-      columns: vec![
-        i_meta.clone(),
-        s_meta.clone()
-      ],
+      columns: columns.clone(),
       ..Default::default()
     }),
     ..Default::default()
@@ -72,26 +71,24 @@ async fn main() -> ClientResult<()> {
     ],
     ..Default::default()
   });
+  let mut basic_fields = HashMap::new();
+  basic_fields.insert(
+    "i".to_string(),
+    FieldValue {
+      value: Some(Value::int64_val(33)),
+      ..Default::default()
+    }
+  );
+  basic_fields.insert(
+    "s".to_string(),
+    FieldValue {
+      value: Some(list_of_strings),
+      ..Default::default()
+    }
+  );
   rows.push(
     Row {
-      fields: vec![
-        Field {
-          name: "i".to_string(),
-          value: MessageField::some(FieldValue {
-            value: Some(Value::int64_val(33)),
-            ..Default::default()
-          }),
-          ..Default::default()
-        },
-        Field {
-          name: "s".to_string(),
-          value: MessageField::some(FieldValue {
-            value: Some(list_of_strings),
-            ..Default::default()
-          }),
-          ..Default::default()
-        },
-      ],
+      fields: basic_fields,
       ..Default::default()
     },
   );
@@ -124,17 +121,12 @@ async fn main() -> ClientResult<()> {
 
   // Read segments
   let mut total = 0;
-  let partition = Vec::<PartitionField>::new();
-  let columns_to_decode = vec![
-    i_meta.clone(),
-    s_meta.clone(),
-  ];
   for segment in &list_resp.segments {
     let rows = client.decode_segment(
       TABLE_NAME,
-      &partition,
+      &HashMap::new(),
       &segment.segment_id,
-      &columns_to_decode,
+      &columns,
     ).await?;
     let count = rows.len();
     total += count;

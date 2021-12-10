@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use pancake_db_idl::dml::{FieldValue, PartitionFieldValue, ReadSegmentColumnRequest, Row};
 use pancake_db_idl::schema::ColumnMeta;
 
@@ -7,7 +9,6 @@ use pancake_db_core::encoding;
 use crate::errors::{ClientError, ClientResult};
 
 use super::Client;
-use std::collections::HashMap;
 
 impl Client {
   pub async fn decode_segment_column(
