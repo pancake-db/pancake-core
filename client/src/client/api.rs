@@ -16,7 +16,9 @@ fn parse_read_segment_response(bytes: Vec<u8>) -> ClientResult<ReadSegmentColumn
   loop {
     let end_idx = i + delim_bytes.len();
     if end_idx > bytes.len() {
-      return Err(ClientError::other(format!("could not parse read segment column response")));
+      return Err(ClientError::other(
+        "could not parse read segment column response".to_string()
+      ));
     }
     if &bytes[i..end_idx] == delim_bytes {
       break;
@@ -96,7 +98,8 @@ impl Client {
     }
 
     if status != StatusCode::OK {
-      let content_str = String::from_utf8(content).unwrap_or("<unparseable bytes>".to_string());
+      let content_str = String::from_utf8(content)
+        .unwrap_or_else(|_| "<unparseable bytes>".to_string());
       return Err(ClientError::http(status, &content_str));
     }
 

@@ -1,21 +1,22 @@
+use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 
 use futures::StreamExt;
-use pancake_db_idl::ddl::{CreateTableRequest, DropTableRequest, GetSchemaRequest, AlterTableRequest};
-use pancake_db_idl::dml::{Field, FieldValue, ListSegmentsRequest, PartitionField, Row, WriteToPartitionRequest};
+use hyper::StatusCode;
+use pancake_db_idl::ddl::{AlterTableRequest, CreateTableRequest, DropTableRequest, GetSchemaRequest};
+use pancake_db_idl::ddl::create_table_request::SchemaMode;
+use pancake_db_idl::dml::{FieldValue, ListSegmentsRequest, Row, WriteToPartitionRequest};
 use pancake_db_idl::dml::field_value::Value;
 use pancake_db_idl::dtype::DataType;
 use pancake_db_idl::schema::{ColumnMeta, Schema};
 use protobuf::{MessageField, ProtobufEnumOrUnknown};
+use rand::Rng;
 use structopt::StructOpt;
 use tokio;
-use hyper::StatusCode;
+use tokio::time::Duration;
 
 use pancake_db_client::Client;
-use pancake_db_client::errors::{ClientResult, ClientErrorKind, ClientError};
-use rand::Rng;
-use pancake_db_idl::ddl::create_table_request::SchemaMode;
-use tokio::time::Duration;
+use pancake_db_client::errors::{ClientError, ClientErrorKind, ClientResult};
 
 const TABLE_NAME: &str = "fuzz_test_table";
 const BATCH_SIZE: usize = 250;
@@ -72,13 +73,16 @@ async fn main() -> ClientResult<()> {
   }?;
 
   // create the table
-  let i_meta = ColumnMeta {
-    name: "col_0".to_string(),
-    dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
-    ..Default::default()
-  };
+  let mut initial_columns = HashMap::new();
+  initial_columns.insert(
+    "col_0".to_string(),
+    ColumnMeta {
+      dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
+      ..Default::default()
+    }
+  );
   let mut schema = Schema {
-    columns: vec![i_meta],
+    columns: initial_columns,
     ..Default::default()
   };
   let create_table_req = CreateTableRequest {
@@ -109,19 +113,21 @@ async fn evolve(i: usize, schema: &mut Schema, opt: &Opt, client: &Client, row_c
 }
 
 async fn evolve_schema(i: usize, schema: &mut Schema, client: &Client) -> ClientResult<()> {
+  let new_column_name = format!("col_{}", i);
   let new_column = ColumnMeta {
-    name: format!("col_{}", i),
     dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
     ..Default::default()
   };
-  schema.columns.push(new_column.clone());
+  schema.columns.insert(new_column_name.clone(), new_column.clone());
 
   // randomly either alter table or declaratively update schema
   let mut rng = rand::thread_rng();
   if rng.gen_bool(0.5) {
+    let mut new_columns = HashMap::new();
+    new_columns.insert(new_column_name, new_column);
     let alter_req = AlterTableRequest {
       table_name: TABLE_NAME.to_string(),
-      new_columns: vec![new_column],
+      new_columns,
       ..Default::default()
     };
     println!("altering table: {:?}", alter_req);
@@ -170,14 +176,13 @@ async fn write_rows(i: usize, opt: &Opt, client: &Client, row_counts: &mut Vec<u
     let mut row = Row::new();
     for col_idx in 0..i + 1 {
       if rng.gen_bool(0.5) {
-        row.fields.push(Field {
-          name: format!("col_{}", col_idx),
-          value: MessageField::some(FieldValue {
+        row.fields.insert(
+          format!("col_{}", col_idx),
+          FieldValue {
             value: Some(Value::int64_val(rng.gen())),
             ..Default::default()
-          }),
-          ..Default::default()
-        })
+          }
+        );
       }
     }
     rows.push(row);
@@ -226,19 +231,18 @@ async fn assert_reads(i: usize, client: &Client, row_counts: &[usize]) -> Client
 
   // Read segments
   let current_row_count = *row_counts.last().unwrap();
-  let partition = Vec::<PartitionField>::new();
   for segment in &list_resp.segments {
     println!("checking all columns for segment {}", segment.segment_id);
     for col_idx in 0..i + 1 {
       let col_meta = ColumnMeta {
-        name: format!("col_{}", col_idx),
         dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
         ..Default::default()
       };
       let fvs = client.decode_segment_column(
         TABLE_NAME,
-        &partition,
+        &HashMap::new(),
         &segment.segment_id,
+        &format!("col_{}", col_idx),
         &col_meta,
       ).await?;
 
