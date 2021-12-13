@@ -1,8 +1,8 @@
 use hyper::{Body, Method, Request, StatusCode};
 use hyper::body::HttpBody;
-use pancake_db_idl::ddl::{CreateTableRequest, CreateTableResponse, GetSchemaRequest, GetSchemaResponse, AlterTableResponse, AlterTableRequest};
+use pancake_db_idl::ddl::{AlterTableRequest, AlterTableResponse, CreateTableRequest, CreateTableResponse, GetSchemaRequest, GetSchemaResponse};
 use pancake_db_idl::ddl::{DropTableRequest, DropTableResponse};
-use pancake_db_idl::dml::{WriteToPartitionRequest, WriteToPartitionResponse};
+use pancake_db_idl::dml::{DeleteFromSegmentRequest, DeleteFromSegmentResponse, WriteToPartitionRequest, WriteToPartitionResponse};
 use pancake_db_idl::dml::{ListSegmentsRequest, ListSegmentsResponse};
 use pancake_db_idl::dml::{ReadSegmentColumnRequest, ReadSegmentColumnResponse};
 
@@ -104,5 +104,13 @@ impl Client {
     }
 
     parse_read_segment_response(content)
+  }
+
+  pub async fn api_delete_from_segment(&self, req: &DeleteFromSegmentRequest) -> ClientResult<DeleteFromSegmentResponse> {
+    self.simple_json_request::<DeleteFromSegmentRequest, DeleteFromSegmentResponse>(
+      "delete_from_segment",
+      Method::POST,
+      req,
+    ).await
   }
 }
