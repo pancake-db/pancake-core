@@ -111,10 +111,9 @@ async fn main() -> ClientResult<()> {
 
 async fn iterate(i: usize, schema: &mut Schema, opt: &Opt, client: &Client, row_counts: &mut Vec<usize>, n_deletions_ub: &mut usize) -> ClientResult<()> {
   evolve_schema(i, schema, client).await?;
-  let n_rows = *row_counts.last().unwrap();
   let write_rows_future = write_rows(i, opt, client, row_counts);
   if i > 1 {
-    let delete_future = delete(opt, client, n_rows, n_deletions_ub);
+    let delete_future = delete(opt, client, n_deletions_ub);
     let (write_rows_res, delete_res) = tokio::join!(
       write_rows_future,
       delete_future,
@@ -226,6 +225,7 @@ async fn write_rows(i: usize, opt: &Opt, client: &Client, row_counts: &mut Vec<u
       }
     )
     .await;
+  println!("done with writes");
 
   row_counts.push(last_row_count + n_batches * n_rows_per_batch);
 
@@ -236,22 +236,27 @@ async fn write_rows(i: usize, opt: &Opt, client: &Client, row_counts: &mut Vec<u
   Ok(())
 }
 
-async fn delete(opt: &Opt, client: &Client, n_rows: usize, n_deletions_ub: &mut usize) -> ClientResult<()> {
+async fn delete(opt: &Opt, client: &Client, n_deletions_ub: &mut usize) -> ClientResult<()> {
+  println!("listing segments for deletion");
   let list_segments_response = client.api_list_segments(&ListSegmentsRequest {
     table_name: TABLE_NAME.to_string(),
+    include_metadata: true,
     ..Default::default()
   }).await?;
-  let segment_id = &list_segments_response.segments[0].segment_id;
-  let mut to_delete = Vec::new();
   let mut rng = rand::thread_rng();
+  let segments = &list_segments_response.segments;
+  let segment = &segments[rng.gen_range(0..segments.len())];
+  let mut to_delete = Vec::new();
   for _ in 0..opt.max_deletions_per_req {
-    to_delete.push(rng.gen_range(0..n_rows) as u32);
+    let metadata = segment.metadata.clone().unwrap();
+    let row_id_range = metadata.row_count; // could go higher
+    to_delete.push(rng.gen_range(0..row_id_range) as u32);
   }
   let distinct_to_delete: HashSet<_> = to_delete.iter().cloned().collect();
   println!("deleting {} distinct row ids", distinct_to_delete.len());
   let req = DeleteFromSegmentRequest {
     table_name: TABLE_NAME.to_string(),
-    segment_id: segment_id.to_string(),
+    segment_id: segment.segment_id.to_string(),
     row_ids: to_delete,
     ..Default::default()
   };
@@ -271,6 +276,12 @@ async fn assert_reads(i: usize, client: &Client, row_counts: &[usize], n_deletio
 
   // Read segments
   let current_row_count = *row_counts.last().unwrap();
+  let mut col_row_counts = Vec::new();
+  let mut col_null_counts = Vec::new();
+  for _ in 0..i + 1 {
+    col_row_counts.push(0);
+    col_null_counts.push(0);
+  }
   for segment in &list_resp.segments {
     println!("checking all columns for segment {}", segment.segment_id);
     let segment_key = SegmentKey {
@@ -279,43 +290,50 @@ async fn assert_reads(i: usize, client: &Client, row_counts: &[usize], n_deletio
       segment_id: segment.segment_id.clone(),
     };
     let is_deleted = client.decode_is_deleted(&segment_key).await?;
-    println!("decoded deletion data to vec of {}", is_deleted.len());
     for col_idx in 0..i + 1 {
       let col_meta = ColumnMeta {
         dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
         ..Default::default()
       };
+      let col_name = format!("col_{}", col_idx);
       let fvs = client.decode_segment_column(
         &segment_key,
-        &format!("col_{}", col_idx),
+        &col_name,
         &col_meta,
         &is_deleted,
       ).await?;
 
-      let l = fvs.len();
-      if l > current_row_count || l + n_deletions_ub < current_row_count {
-        return Err(ClientError::other(format!(
-          "expected {} to {} rows for col_{} at evolution {} but found {}",
-          current_row_count as i64 - n_deletions_ub as i64,
-          current_row_count,
-          col_idx,
-          i,
-          fvs.len()
-        )));
-      }
-
-      let n_nulls_lb = row_counts[col_idx].max(n_deletions_ub) - n_deletions_ub;
-      for row_idx in 0..n_nulls_lb {
-        if let Some(x) = &fvs[row_idx].value {
-          return Err(ClientError::other(format!(
-            "expected the first {} rows for col_{} to be null, but row {} was {:?}",
-            n_nulls_lb,
-            col_idx,
-            row_idx,
-            x,
-          )));
+      col_row_counts[col_idx] += fvs.len();
+      for fv in &fvs {
+        if fv.value.is_none() {
+          col_null_counts[col_idx] += 1;
         }
       }
+    }
+  }
+
+  for col_idx in 0..i + 1 {
+    let l = col_row_counts[col_idx];
+    if l > current_row_count || l + n_deletions_ub < current_row_count {
+      return Err(ClientError::other(format!(
+        "expected {} to {} rows for col_{} at evolution {} but found {}",
+        current_row_count as i64 - n_deletions_ub as i64,
+        current_row_count,
+        col_idx,
+        i,
+        l,
+      )));
+    }
+
+    let n_nulls = col_null_counts[col_idx];
+    let n_nulls_lb = row_counts[col_idx].max(n_deletions_ub) - n_deletions_ub;
+    if n_nulls < n_nulls_lb {
+      return Err(ClientError::other(format!(
+        "expected the first {} rows for col_{} to be null, but only {} rows were null",
+        n_nulls_lb,
+        col_idx,
+        n_nulls,
+      )));
     }
   }
 

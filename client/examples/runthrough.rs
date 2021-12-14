@@ -2,14 +2,14 @@ use std::net::{IpAddr, Ipv4Addr};
 
 use futures::StreamExt;
 use pancake_db_idl::ddl::{CreateTableRequest, DropTableRequest, GetSchemaRequest};
-use pancake_db_idl::dml::{ListSegmentsRequest, FieldValue, RepeatedFieldValue, Row, WriteToPartitionRequest};
+use pancake_db_idl::dml::{ListSegmentsRequest, FieldValue, RepeatedFieldValue, Row, WriteToPartitionRequest, DeleteFromSegmentRequest};
 use pancake_db_idl::dml::field_value::Value;
 use pancake_db_idl::dtype::DataType;
 use pancake_db_idl::schema::{ColumnMeta, Schema};
 use protobuf::{MessageField, ProtobufEnumOrUnknown};
 use tokio;
 
-use pancake_db_client::Client;
+use pancake_db_client::{Client, SegmentKey};
 use pancake_db_client::errors::ClientResult;
 use std::collections::HashMap;
 
@@ -112,28 +112,53 @@ async fn main() -> ClientResult<()> {
     .await;
 
   // List segments
-  let list_segments_eq = ListSegmentsRequest {
+  let list_segments_req = ListSegmentsRequest {
     table_name: TABLE_NAME.to_string(),
     ..Default::default()
   };
-  let list_resp = client.api_list_segments(&list_segments_eq).await?;
+  let list_resp = client.api_list_segments(&list_segments_req).await?;
   println!("Listed segments: {:?}", list_resp);
+
+  // Delete from segment
+  let segment_id = list_resp.segments[0].segment_id.clone();
+  let delete_req = DeleteFromSegmentRequest {
+    table_name: TABLE_NAME.to_string(),
+    segment_id: segment_id.clone(),
+    row_ids: vec![0, 4, 10],
+    ..Default::default()
+  };
+  let delete_resp = client.api_delete_from_segment(&delete_req).await?;
+  println!("Deleted rows from segment {}: {:?}", segment_id, delete_resp);
+  let delete_resp = client.api_delete_from_segment(&delete_req).await?;
+  println!("Idempotently deleted same rows again: {:?}", delete_resp);
+
+  let mut read_columns = columns;
+  read_columns.insert("_row_id".to_string(), ColumnMeta {
+    dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
+    ..Default::default()
+  });
 
   // Read segments
   let mut total = 0;
   for segment in &list_resp.segments {
+    let segment_key = SegmentKey {
+      table_name: TABLE_NAME.to_string(),
+      segment_id: segment.segment_id.clone(),
+      ..Default::default()
+    };
     let rows = client.decode_segment(
-      TABLE_NAME,
-      &HashMap::new(),
-      &segment.segment_id,
-      &columns,
+      &segment_key,
+      &read_columns,
     ).await?;
     let count = rows.len();
     total += count;
     println!("read segment {} with {} rows (total {})", segment.segment_id, count, total);
+    for i in 0..10 {
+      println!("\t{}th row: {:?}", i, rows[i].clone());
+    }
   }
 
-  // Drop table
+  Drop table
   let drop_resp = client.api_drop_table(&DropTableRequest {
     table_name: TABLE_NAME.to_string(),
     ..Default::default()
