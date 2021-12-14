@@ -37,9 +37,11 @@ impl Display for ClientErrorKind {
 }
 
 impl ClientError {
-  pub fn http(status: StatusCode, message: &str) -> Self {
+  pub fn http(status: StatusCode, resp_bytes: Vec<u8>) -> Self {
+    let message = String::from_utf8(resp_bytes)
+      .unwrap_or_else(|_| "<unparseable bytes>".to_string());
     ClientError {
-      message: message.to_string(),
+      message,
       kind: ClientErrorKind::Http(status)
     }
   }

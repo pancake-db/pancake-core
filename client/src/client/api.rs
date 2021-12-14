@@ -1,16 +1,16 @@
-use hyper::{Body, Method, Request, StatusCode};
-use hyper::body::HttpBody;
-use pancake_db_idl::ddl::{CreateTableRequest, CreateTableResponse, GetSchemaRequest, GetSchemaResponse, AlterTableResponse, AlterTableRequest};
+use hyper::Method;
+use pancake_db_idl::ddl::{AlterTableRequest, AlterTableResponse, CreateTableRequest, CreateTableResponse, GetSchemaRequest, GetSchemaResponse};
 use pancake_db_idl::ddl::{DropTableRequest, DropTableResponse};
-use pancake_db_idl::dml::{WriteToPartitionRequest, WriteToPartitionResponse};
+use pancake_db_idl::dml::{DeleteFromSegmentRequest, DeleteFromSegmentResponse, ReadSegmentDeletionsRequest, ReadSegmentDeletionsResponse, WriteToPartitionRequest, WriteToPartitionResponse};
 use pancake_db_idl::dml::{ListSegmentsRequest, ListSegmentsResponse};
 use pancake_db_idl::dml::{ReadSegmentColumnRequest, ReadSegmentColumnResponse};
+use protobuf::Message;
 
 use crate::errors::{ClientError, ClientResult};
 
 use super::Client;
 
-fn parse_read_segment_response(bytes: Vec<u8>) -> ClientResult<ReadSegmentColumnResponse> {
+fn parse_pb_with_bytes<Resp: Message>(bytes: Vec<u8>) -> ClientResult<(Resp, Vec<u8>)> {
   let delim_bytes = "}\n".as_bytes();
   let mut i = 0;
   loop {
@@ -26,10 +26,9 @@ fn parse_read_segment_response(bytes: Vec<u8>) -> ClientResult<ReadSegmentColumn
     i += 1;
   }
   let content_str = String::from_utf8(bytes[0..i + 1].to_vec())?;
-  let mut res = ReadSegmentColumnResponse::new();
+  let mut res = Resp::new();
   protobuf::json::merge_from_str(&mut res, &content_str)?;
-  res.data = bytes[i + delim_bytes.len()..].to_vec();
-  Ok(res)
+  Ok((res, bytes[i + delim_bytes.len()..].to_vec()))
 }
 
 impl Client {
@@ -81,28 +80,35 @@ impl Client {
     ).await
   }
 
+  pub async fn api_delete_from_segment(&self, req: &DeleteFromSegmentRequest) -> ClientResult<DeleteFromSegmentResponse> {
+    self.simple_json_request::<DeleteFromSegmentRequest, DeleteFromSegmentResponse>(
+      "delete_from_segment",
+      Method::POST,
+      req,
+    ).await
+  }
+
+  pub async fn api_read_segment_deletions(&self, req: &ReadSegmentDeletionsRequest) -> ClientResult<ReadSegmentDeletionsResponse> {
+    let content = self.simple_json_request_bytes(
+      "read_segment_deletions",
+      Method::GET,
+      req,
+    ).await?;
+
+    let (mut resp, data) = parse_pb_with_bytes::<ReadSegmentDeletionsResponse>(content)?;
+    resp.data = data;
+    Ok(resp)
+  }
+
   pub async fn api_read_segment_column(&self, req: &ReadSegmentColumnRequest) -> ClientResult<ReadSegmentColumnResponse> {
-    let uri = self.rest_endpoint("read_segment_column");
-    let pb_str = protobuf::json::print_to_string(req)?;
+    let content = self.simple_json_request_bytes(
+      "read_segment_column",
+      Method::GET,
+      req,
+    ).await?;
 
-    let http_req = Request::builder()
-      .method(Method::GET)
-      .uri(&uri)
-      .header("Content-Type", "application/json")
-      .body(Body::from(pb_str))?;
-    let mut resp = self.h_client.request(http_req).await?;
-    let status = resp.status();
-    let mut content = Vec::new();
-    while let Some(chunk) = resp.body_mut().data().await {
-      content.extend(chunk?);
-    }
-
-    if status != StatusCode::OK {
-      let content_str = String::from_utf8(content)
-        .unwrap_or_else(|_| "<unparseable bytes>".to_string());
-      return Err(ClientError::http(status, &content_str));
-    }
-
-    parse_read_segment_response(content)
+    let (mut resp, data) = parse_pb_with_bytes::<ReadSegmentColumnResponse>(content)?;
+    resp.data = data;
+    Ok(resp)
   }
 }
