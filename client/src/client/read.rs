@@ -16,6 +16,7 @@ impl Client {
   pub async fn decode_is_deleted(
     &self,
     segment_key: &SegmentKey,
+    correlation_id: &str,
   ) -> ClientResult<Vec<bool>> {
     let SegmentKey {
       table_name,
@@ -27,6 +28,7 @@ impl Client {
       table_name: table_name.to_string(),
       partition: partition.clone(),
       segment_id: segment_id.to_string(),
+      correlation_id: correlation_id.to_string(),
       ..Default::default()
     };
 
@@ -45,6 +47,7 @@ impl Client {
     column_name: &str,
     column: &ColumnMeta,
     is_deleted: &[bool],
+    correlation_id: &str,
   ) -> ClientResult<Vec<FieldValue>> {
     let SegmentKey {
       table_name,
@@ -63,6 +66,7 @@ impl Client {
         partition: partition.clone(),
         segment_id: segment_id.to_string(),
         column_name: column_name.to_string(),
+        correlation_id: correlation_id.to_string(),
         continuation_token,
         ..Default::default()
       };
@@ -139,7 +143,9 @@ impl Client {
       ))
     }
 
-    let is_deleted = self.decode_is_deleted(segment_key).await?;
+    let correlation_id = super::new_correlation_id();
+
+    let is_deleted = self.decode_is_deleted(segment_key, &correlation_id).await?;
 
     let mut n = usize::MAX;
     let mut rows = Vec::new();
@@ -149,6 +155,7 @@ impl Client {
         column_name,
         column_meta,
         &is_deleted,
+        &correlation_id,
       ).await?;
       n = n.min(fvalues.len());
       for _ in rows.len()..n {

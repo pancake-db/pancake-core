@@ -158,7 +158,7 @@ async fn main() -> ClientResult<()> {
     }
   }
 
-  Drop table
+  // Drop table
   let drop_resp = client.api_drop_table(&DropTableRequest {
     table_name: TABLE_NAME.to_string(),
     ..Default::default()

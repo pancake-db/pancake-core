@@ -289,7 +289,8 @@ async fn assert_reads(i: usize, client: &Client, row_counts: &[usize], n_deletio
       partition: HashMap::new(),
       segment_id: segment.segment_id.clone(),
     };
-    let is_deleted = client.decode_is_deleted(&segment_key).await?;
+    let correlation_id = pancake_db_client::new_correlation_id();
+    let is_deleted = client.decode_is_deleted(&segment_key, &correlation_id).await?;
     for col_idx in 0..i + 1 {
       let col_meta = ColumnMeta {
         dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
@@ -301,6 +302,7 @@ async fn assert_reads(i: usize, client: &Client, row_counts: &[usize], n_deletio
         &col_name,
         &col_meta,
         &is_deleted,
+        &correlation_id,
       ).await?;
 
       col_row_counts[col_idx] += fvs.len();

@@ -6,6 +6,7 @@ use hyper::client::HttpConnector;
 use protobuf::Message;
 
 use crate::errors::{ClientError, ClientResult};
+use uuid::Uuid;
 
 mod api;
 mod read;
@@ -77,3 +78,8 @@ impl Client {
     Ok(res)
   }
 }
+
+pub fn new_correlation_id() -> String {
+  Uuid::new_v4().to_string()
+}
+
