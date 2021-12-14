@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr};
 
 use futures::StreamExt;
 use hyper::StatusCode;
 use pancake_db_idl::ddl::{AlterTableRequest, CreateTableRequest, DropTableRequest, GetSchemaRequest};
 use pancake_db_idl::ddl::create_table_request::SchemaMode;
-use pancake_db_idl::dml::{FieldValue, ListSegmentsRequest, Row, WriteToPartitionRequest};
+use pancake_db_idl::dml::{FieldValue, ListSegmentsRequest, Row, WriteToPartitionRequest, DeleteFromSegmentRequest};
 use pancake_db_idl::dml::field_value::Value;
 use pancake_db_idl::dtype::DataType;
 use pancake_db_idl::schema::{ColumnMeta, Schema};
@@ -15,7 +15,7 @@ use structopt::StructOpt;
 use tokio;
 use tokio::time::Duration;
 
-use pancake_db_client::Client;
+use pancake_db_client::{Client, SegmentKey};
 use pancake_db_client::errors::{ClientError, ClientErrorKind, ClientResult};
 
 const TABLE_NAME: &str = "fuzz_test_table";
@@ -29,6 +29,9 @@ pub struct Opt {
 
   #[structopt(long, default_value = "10000")]
   pub big_n_rows: usize,
+
+  #[structopt(long, default_value = "10")]
+  pub max_deletions_per_req: usize,
 
   #[structopt(long, default_value = "12")]
   pub compaction_wait_time: u64,
@@ -95,20 +98,33 @@ async fn main() -> ClientResult<()> {
 
   let opt: Opt = Opt::from_args();
 
-  // do random schema evolutions and writing rows,
+  // do random schema evolutions, writing rows, and deleting rows,
   // each time checking that the data makes sense
   let mut row_counts = vec![0, 0]; // expected row counts after each schema evolution
+  let mut n_deletions_ub = 0;
   for iter in 1..opt.num_evolutions + 1 {
-    evolve(iter, &mut schema, &opt, &client, &mut row_counts).await?;
+    iterate(iter, &mut schema, &opt, &client, &mut row_counts, &mut n_deletions_ub).await?;
   }
 
   Ok(())
 }
 
-async fn evolve(i: usize, schema: &mut Schema, opt: &Opt, client: &Client, row_counts: &mut Vec<usize>) -> ClientResult<()> {
+async fn iterate(i: usize, schema: &mut Schema, opt: &Opt, client: &Client, row_counts: &mut Vec<usize>, n_deletions_ub: &mut usize) -> ClientResult<()> {
   evolve_schema(i, schema, client).await?;
-  write_rows(i, opt, client, row_counts).await?;
-  assert_reads(i, client, row_counts).await?;
+  let n_rows = *row_counts.last().unwrap();
+  let write_rows_future = write_rows(i, opt, client, row_counts);
+  if i > 1 {
+    let delete_future = delete(opt, client, n_rows, n_deletions_ub);
+    let (write_rows_res, delete_res) = tokio::join!(
+      write_rows_future,
+      delete_future,
+    );
+    write_rows_res?;
+    delete_res?;
+  } else {
+    write_rows_future.await?;
+  }
+  assert_reads(i, client, row_counts, *n_deletions_ub).await?;
   Ok(())
 }
 
@@ -220,7 +236,31 @@ async fn write_rows(i: usize, opt: &Opt, client: &Client, row_counts: &mut Vec<u
   Ok(())
 }
 
-async fn assert_reads(i: usize, client: &Client, row_counts: &[usize]) -> ClientResult<()> {
+async fn delete(opt: &Opt, client: &Client, n_rows: usize, n_deletions_ub: &mut usize) -> ClientResult<()> {
+  let list_segments_response = client.api_list_segments(&ListSegmentsRequest {
+    table_name: TABLE_NAME.to_string(),
+    ..Default::default()
+  }).await?;
+  let segment_id = &list_segments_response.segments[0].segment_id;
+  let mut to_delete = Vec::new();
+  let mut rng = rand::thread_rng();
+  for _ in 0..opt.max_deletions_per_req {
+    to_delete.push(rng.gen_range(0..n_rows) as u32);
+  }
+  let distinct_to_delete: HashSet<_> = to_delete.iter().cloned().collect();
+  println!("deleting {} distinct row ids", distinct_to_delete.len());
+  let req = DeleteFromSegmentRequest {
+    table_name: TABLE_NAME.to_string(),
+    segment_id: segment_id.to_string(),
+    row_ids: to_delete,
+    ..Default::default()
+  };
+  *n_deletions_ub += opt.max_deletions_per_req;
+  client.api_delete_from_segment(&req).await?;
+  Ok(())
+}
+
+async fn assert_reads(i: usize, client: &Client, row_counts: &[usize], n_deletions_ub: usize) -> ClientResult<()> {
   // List segments
   let list_req = ListSegmentsRequest {
     table_name: TABLE_NAME.to_string(),
@@ -233,22 +273,30 @@ async fn assert_reads(i: usize, client: &Client, row_counts: &[usize]) -> Client
   let current_row_count = *row_counts.last().unwrap();
   for segment in &list_resp.segments {
     println!("checking all columns for segment {}", segment.segment_id);
+    let segment_key = SegmentKey {
+      table_name: TABLE_NAME.to_string(),
+      partition: HashMap::new(),
+      segment_id: segment.segment_id.clone(),
+    };
+    let is_deleted = client.decode_is_deleted(&segment_key).await?;
+    println!("decoded deletion data to vec of {}", is_deleted.len());
     for col_idx in 0..i + 1 {
       let col_meta = ColumnMeta {
         dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
         ..Default::default()
       };
       let fvs = client.decode_segment_column(
-        TABLE_NAME,
-        &HashMap::new(),
-        &segment.segment_id,
+        &segment_key,
         &format!("col_{}", col_idx),
         &col_meta,
+        &is_deleted,
       ).await?;
 
-      if fvs.len() != current_row_count {
+      let l = fvs.len();
+      if l > current_row_count || l + n_deletions_ub < current_row_count {
         return Err(ClientError::other(format!(
-          "expected {} rows for col_{} at evolution {} but found {}",
+          "expected {} to {} rows for col_{} at evolution {} but found {}",
+          current_row_count as i64 - n_deletions_ub as i64,
           current_row_count,
           col_idx,
           i,
@@ -256,11 +304,12 @@ async fn assert_reads(i: usize, client: &Client, row_counts: &[usize]) -> Client
         )));
       }
 
-      for row_idx in 0..row_counts[col_idx] {
+      let n_nulls_lb = row_counts[col_idx].max(n_deletions_ub) - n_deletions_ub;
+      for row_idx in 0..n_nulls_lb {
         if let Some(x) = &fvs[row_idx].value {
           return Err(ClientError::other(format!(
             "expected the first {} rows for col_{} to be null, but row {} was {:?}",
-            row_counts[col_idx],
+            n_nulls_lb,
             col_idx,
             row_idx,
             x,

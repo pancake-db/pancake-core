@@ -1,24 +1,56 @@
 use std::collections::HashMap;
 
-use pancake_db_idl::dml::{FieldValue, PartitionFieldValue, ReadSegmentColumnRequest, Row};
+use pancake_db_idl::dml::{FieldValue, ReadSegmentColumnRequest, ReadSegmentDeletionsRequest, Row};
 use pancake_db_idl::schema::ColumnMeta;
 
 use pancake_db_core::compression;
+use pancake_db_core::deletion;
 use pancake_db_core::encoding;
 
 use crate::errors::{ClientError, ClientResult};
 
 use super::Client;
+use super::types::SegmentKey;
 
 impl Client {
+  pub async fn decode_is_deleted(
+    &self,
+    segment_key: &SegmentKey,
+  ) -> ClientResult<Vec<bool>> {
+    let SegmentKey {
+      table_name,
+      partition,
+      segment_id,
+    } = segment_key;
+
+    let req = ReadSegmentDeletionsRequest {
+      table_name: table_name.to_string(),
+      partition: partition.clone(),
+      segment_id: segment_id.to_string(),
+      ..Default::default()
+    };
+
+    let resp = self.api_read_segment_deletions(&req).await?;
+    let bools = if resp.data.is_empty() {
+      Vec::new()
+    } else {
+      deletion::decompress_deletions(resp.data)?
+    };
+    Ok(bools)
+  }
+
   pub async fn decode_segment_column(
     &self,
-    table_name: &str,
-    partition: &HashMap<String, PartitionFieldValue>,
-    segment_id: &str,
+    segment_key: &SegmentKey,
     column_name: &str,
     column: &ColumnMeta,
+    is_deleted: &[bool],
   ) -> ClientResult<Vec<FieldValue>> {
+    let SegmentKey {
+      table_name,
+      partition,
+      segment_id,
+    } = segment_key;
     let mut initial_request = true;
     let mut continuation_token = "".to_string();
     let mut compressed_bytes = Vec::new();
@@ -49,6 +81,7 @@ impl Client {
     let mut res = Vec::new();
 
     let dtype = column.dtype.enum_value_or_default();
+    let mut row_idx = 0;
     if !compressed_bytes.is_empty() {
       if implicit_nulls_count > 0 {
         return Err(ClientError::other(
@@ -60,14 +93,23 @@ impl Client {
         dtype,
         &codec,
       )?;
-      res.extend(decompressor.decompress(
+      let fvs = decompressor.decompress(
         compressed_bytes,
         column.nested_list_depth as u8,
-      )?);
+      )?;
+      for fv in fvs {
+        if row_idx >= is_deleted.len() || !is_deleted[row_idx] {
+          res.push(fv);
+        }
+        row_idx += 1
+      }
     }
 
     for _ in 0..implicit_nulls_count {
-      res.push(FieldValue::new());
+      if row_idx >= is_deleted.len() || !is_deleted[row_idx] {
+        res.push(FieldValue::new());
+      }
+      row_idx += 1;
     }
 
     if !uncompressed_bytes.is_empty() {
@@ -75,7 +117,12 @@ impl Client {
         dtype,
         column.nested_list_depth as u8,
       );
-      res.extend(decoder.decode(&uncompressed_bytes)?);
+      for fv in decoder.decode(&uncompressed_bytes)? {
+        if row_idx >= is_deleted.len() || !is_deleted[row_idx] {
+          res.push(fv);
+        }
+        row_idx += 1
+      }
     }
 
     Ok(res)
@@ -83,9 +130,7 @@ impl Client {
 
   pub async fn decode_segment(
     &self,
-    table_name: &str,
-    partition: &HashMap<String, PartitionFieldValue>,
-    segment_id: &str,
+    segment_key: &SegmentKey,
     columns: &HashMap<String, ColumnMeta>,
   ) -> ClientResult<Vec<Row>> {
     if columns.is_empty() {
@@ -94,15 +139,16 @@ impl Client {
       ))
     }
 
+    let is_deleted = self.decode_is_deleted(segment_key).await?;
+
     let mut n = usize::MAX;
     let mut rows = Vec::new();
     for (column_name, column_meta) in columns {
       let fvalues = self.decode_segment_column(
-        table_name,
-        partition,
-        segment_id,
+        segment_key,
         column_name,
         column_meta,
+        &is_deleted,
       ).await?;
       n = n.min(fvalues.len());
       for _ in rows.len()..n {
@@ -113,6 +159,6 @@ impl Client {
       }
     }
 
-    Ok(rows)
+    Ok(rows[0..n].to_vec())
   }
 }

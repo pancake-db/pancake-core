@@ -9,6 +9,7 @@ use crate::errors::{ClientError, ClientResult};
 
 mod api;
 mod read;
+pub mod types;
 
 #[derive(Clone, Debug)]
 pub struct Client {
@@ -31,12 +32,12 @@ impl Client {
     format!("http://{}:{}/rest/{}", self.ip, self.port, name)
   }
 
-  async fn simple_json_request<Req: Message, Resp: Message>(
+  async fn simple_json_request_bytes<Req: Message>(
     &self,
     endpoint_name: &str,
     method: Method,
     req: &Req
-  ) -> ClientResult<Resp> {
+  ) -> ClientResult<Vec<u8>> {
     let uri = self.rest_endpoint(endpoint_name);
     let pb_str = protobuf::json::print_to_string(req)?;
 
@@ -47,14 +48,30 @@ impl Client {
       .body(Body::from(pb_str))?;
     let mut resp = self.h_client.request(http_req).await?;
     let status = resp.status();
-    let mut content = String::new();
+    let mut content = Vec::new();
     while let Some(chunk) = resp.body_mut().data().await {
-      content.push_str(&String::from_utf8(chunk?.to_vec())?);
+      content.extend(chunk?.to_vec());
     }
 
     if status != StatusCode::OK {
-      return Err(ClientError::http(status, &content));
+      return Err(ClientError::http(status, content));
     }
+    Ok(content)
+  }
+
+  async fn simple_json_request<Req: Message, Resp: Message>(
+    &self,
+    endpoint_name: &str,
+    method: Method,
+    req: &Req
+  ) -> ClientResult<Resp> {
+    let bytes = self.simple_json_request_bytes(
+      endpoint_name,
+      method,
+      req
+    ).await?;
+
+    let content = String::from_utf8(bytes)?;
     let mut res = Resp::new();
     protobuf::json::merge_from_str(&mut res, &content)?;
     Ok(res)
