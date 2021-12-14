@@ -41,7 +41,7 @@ impl ClientError {
     let message = String::from_utf8(resp_bytes)
       .unwrap_or_else(|_| "<unparseable bytes>".to_string());
     ClientError {
-      message: message.to_string(),
+      message,
       kind: ClientErrorKind::Http(status)
     }
   }
