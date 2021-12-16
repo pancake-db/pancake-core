@@ -1,19 +1,23 @@
+use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 
 use futures::StreamExt;
+use pancake_db_idl::dml::partition_field_value::Value as PartitionValue;
 use pancake_db_idl::ddl::{CreateTableRequest, DropTableRequest, GetSchemaRequest};
-use pancake_db_idl::dml::{ListSegmentsRequest, FieldValue, RepeatedFieldValue, Row, WriteToPartitionRequest, DeleteFromSegmentRequest};
+use pancake_db_idl::dml::{DeleteFromSegmentRequest, FieldValue, ListSegmentsRequest, PartitionFieldValue, RepeatedFieldValue, Row, WriteToPartitionRequest, Segment};
 use pancake_db_idl::dml::field_value::Value;
 use pancake_db_idl::dtype::DataType;
-use pancake_db_idl::schema::{ColumnMeta, Schema};
+use pancake_db_idl::partition_dtype::PartitionDataType;
+use pancake_db_idl::schema::{ColumnMeta, PartitionMeta, Schema};
 use protobuf::{MessageField, ProtobufEnumOrUnknown};
+use rand::Rng;
 use tokio;
 
 use pancake_db_client::{Client, SegmentKey};
 use pancake_db_client::errors::ClientResult;
-use std::collections::HashMap;
 
 const TABLE_NAME: &str = "client_runthrough_table";
+const N_PARTITIONS: i64 = 3;
 
 #[tokio::main]
 async fn main() -> ClientResult<()> {
@@ -36,9 +40,15 @@ async fn main() -> ClientResult<()> {
   let mut columns = HashMap::new();
   columns.insert("i".to_string(), i_meta);
   columns.insert("s".to_string(), s_meta);
+  let mut partitioning = HashMap::new();
+  partitioning.insert("pk".to_string(), PartitionMeta {
+    dtype: ProtobufEnumOrUnknown::new(PartitionDataType::INT64),
+    ..Default::default()
+  });
   let create_table_req = CreateTableRequest {
     table_name: TABLE_NAME.to_string(),
     schema: MessageField::some(Schema {
+      partitioning,
       columns: columns.clone(),
       ..Default::default()
     }),
@@ -106,7 +116,13 @@ async fn main() -> ClientResult<()> {
     .for_each_concurrent(
       max_concurrency,
       |_| async {
-        client.api_write_to_partition(&write_to_partition_req).await.expect("write failed");
+        let mut req = write_to_partition_req.clone();
+        let mut rng = rand::thread_rng();
+        req.partition.insert("pk".to_string(), PartitionFieldValue {
+          value: Some(PartitionValue::int64_val(rng.gen_range(0..N_PARTITIONS))),
+          ..Default::default()
+        });
+        client.api_write_to_partition(&req).await.expect("write failed");
       }
     )
     .await;
@@ -120,10 +136,12 @@ async fn main() -> ClientResult<()> {
   println!("Listed segments: {:?}", list_resp);
 
   // Delete from segment
-  let segment_id = list_resp.segments[0].segment_id.clone();
+  let segment = list_resp.segments[0].clone();
+  let Segment { segment_id, partition, .. } = segment;
   let delete_req = DeleteFromSegmentRequest {
     table_name: TABLE_NAME.to_string(),
     segment_id: segment_id.clone(),
+    partition,
     row_ids: vec![0, 4, 10],
     ..Default::default()
   };
@@ -144,6 +162,7 @@ async fn main() -> ClientResult<()> {
     let segment_key = SegmentKey {
       table_name: TABLE_NAME.to_string(),
       segment_id: segment.segment_id.clone(),
+      partition: segment.partition.clone(),
       ..Default::default()
     };
     let rows = client.decode_segment(
