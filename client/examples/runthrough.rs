@@ -14,7 +14,8 @@ use rand::Rng;
 use tokio;
 
 use pancake_db_client::{Client, SegmentKey};
-use pancake_db_client::errors::ClientResult;
+use pancake_db_client::errors::{ClientResult, ClientErrorKind};
+use hyper::StatusCode;
 
 const TABLE_NAME: &str = "client_runthrough_table";
 const N_PARTITIONS: i64 = 3;
@@ -26,6 +27,24 @@ async fn main() -> ClientResult<()> {
     IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
     1337,
   );
+
+  // Drop table (if it exists)
+  let drop_table_res = client.api_drop_table(&DropTableRequest {
+    table_name: TABLE_NAME.to_string(),
+    ..Default::default()
+  }).await;
+  match drop_table_res {
+    Ok(resp) => {
+      println!("Dropped existing table: {:?}", resp);
+      Ok(())
+    },
+    Err(err) => {
+      match err.kind {
+        ClientErrorKind::Http(StatusCode::NOT_FOUND) => Ok(()),
+        _ => Err(err),
+      }
+    }
+  }?;
 
   // Create a table
   let i_meta = ColumnMeta {
@@ -176,13 +195,6 @@ async fn main() -> ClientResult<()> {
       println!("\t{}th row: {:?}", i, rows[i].clone());
     }
   }
-
-  // Drop table
-  let drop_resp = client.api_drop_table(&DropTableRequest {
-    table_name: TABLE_NAME.to_string(),
-    ..Default::default()
-  }).await?;
-  println!("Dropped table: {:?}", drop_resp);
 
   Ok(())
 }

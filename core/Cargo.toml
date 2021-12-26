@@ -13,5 +13,5 @@ repository = "https://github.com/pancake-db/pancake-core/"
 [dependencies]
 pancake-db-idl = {path="../../pancake-idl/rust"}
 protobuf = "=3.0.0-alpha.2"
-q_compress = "0.3.1"
+q_compress = "0.4.0"
 zstd = "0.9"

@@ -1,6 +1,6 @@
-use q_compress::{BitReader, TimestampMicros};
 use q_compress::compressor::Compressor as RawQCompressor;
 use q_compress::decompressor::Decompressor as RawQDecompressor;
+use q_compress::{CompressorConfig, TimestampMicros};
 use q_compress::types::NumberLike;
 
 use crate::compression::Codec;
@@ -22,18 +22,15 @@ macro_rules! qcompressor {
       type P = $primitive_type;
 
       fn compress_atoms(&self, primitives: &[$primitive_type]) -> CoreResult<Vec<u8>> {
-        let nums = primitives.to_vec();
-        let compressor = RawQCompressor::<$primitive_type>::train(
-          nums,
-          Q_MAX_DEPTH
-        )?;
-        Ok(compressor.compress(&primitives)?)
+        let compressor = RawQCompressor::<$primitive_type>::from_config(CompressorConfig {
+          max_depth: Q_MAX_DEPTH,
+        });
+        Ok(compressor.simple_compress(primitives)?)
       }
 
       fn decompress_atoms(&self, bytes: &[u8]) -> CoreResult<Vec<$primitive_type>> {
-        let mut bit_reader = BitReader::from(bytes.to_vec());
-        let decompressor = RawQDecompressor::<$primitive_type>::from_reader(&mut bit_reader)?;
-        Ok(decompressor.decompress(&mut bit_reader))
+        let decompressor = RawQDecompressor::<$primitive_type>::default();
+        Ok(decompressor.simple_decompress(bytes.to_vec())?)
       }
     }
   }

@@ -34,16 +34,20 @@ impl<P: Primitive> ValueCodec for Box<dyn Codec<P=P>> {
   }
 
   fn decompress_rep_levels(&self, bytes: Vec<u8>) -> CoreResult<RepLevelsAndBytes> {
-    let mut bit_reader = BitReader::from(bytes);
-    let bit_reader_ptr = &mut bit_reader;
-    let rep_level_decompressor = U32Decompressor::from_reader(bit_reader_ptr)?;
-    let rep_levels = rep_level_decompressor.decompress(bit_reader_ptr)
-      .iter()
-      .map(|&l| l as u8)
-      .collect();
+    let decompressor = U32Decompressor::default();
+    let mut reader = BitReader::from(bytes);
+    let flags = decompressor.header(&mut reader)?;
+    let mut rep_levels = Vec::new();
+    while let Some(chunk) = decompressor.decompress_chunk(&mut reader, &flags)? {
+      rep_levels.extend(
+        chunk.nums
+          .iter()
+          .map(|&l| l as u8)
+      );
+    }
 
     Ok(RepLevelsAndBytes {
-      remaining_bytes: bit_reader.drain_bytes()?.to_vec(),
+      remaining_bytes: reader.drain_bytes()?.to_vec(),
       levels: rep_levels,
     })
   }

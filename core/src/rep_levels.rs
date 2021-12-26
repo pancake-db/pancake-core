@@ -5,8 +5,6 @@ use q_compress::U32Compressor;
 use crate::errors::{CoreError, CoreResult};
 use crate::primitives::{Atom, Primitive};
 
-const REPETITION_LEVEL_Q_COMPRESSION_LEVEL: u32 = 6;
-
 #[derive(Clone, Debug, Default)]
 pub struct RepLevelsAndAtoms<A: Atom> {
   pub levels: Vec<u8>,
@@ -106,11 +104,8 @@ pub fn extract_single_levels_and_atoms<P: Primitive>(
 
 pub fn compress_rep_levels(rep_levels: Vec<u8>) -> CoreResult<Vec<u8>> {
   let rep_levels = rep_levels.iter().map(|&l| l as u32).collect::<Vec<u32>>();
-  let compressor = U32Compressor::train(
-    rep_levels.clone(),
-    REPETITION_LEVEL_Q_COMPRESSION_LEVEL
-  )?;
-  Ok(compressor.compress(&rep_levels)?)
+  let compressor = U32Compressor::default();
+  Ok(compressor.simple_compress(&rep_levels)?)
 }
 
 pub struct AtomNester<P: Primitive> {
