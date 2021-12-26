@@ -406,7 +406,7 @@ dependencies = [
  "futures",
  "hyper",
  "pancake-db-core",
- "pancake-db-idl",
+ "pancake-db-idl 0.0.0-alpha.1",
  "protobuf",
  "rand",
  "structopt",
@@ -418,7 +418,7 @@ dependencies = [
 name = "pancake-db-core"
 version = "0.0.0-alpha.1"
 dependencies = [
- "pancake-db-idl",
+ "pancake-db-idl 0.0.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf",
  "q_compress",
  "zstd",
@@ -427,6 +427,15 @@ dependencies = [
 [[package]]
 name = "pancake-db-idl"
 version = "0.0.0-alpha.1"
+dependencies = [
+ "protobuf",
+]
+
+[[package]]
+name = "pancake-db-idl"
+version = "0.0.0-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b0a4fd1b0ab4b9272fb41283d10f1308993599d3523d5ce236c4360297e3af4"
 dependencies = [
  "protobuf",
 ]

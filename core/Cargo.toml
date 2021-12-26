@@ -11,7 +11,7 @@ license = "Apache-2.0"
 repository = "https://github.com/pancake-db/pancake-core/"
 
 [dependencies]
-pancake-db-idl = {path="../../pancake-idl/rust"}
+pancake-db-idl = "=0.0.0-alpha.1"
 protobuf = "=3.0.0-alpha.2"
 q_compress = "0.4.0"
 zstd = "0.9"
