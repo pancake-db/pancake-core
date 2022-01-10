@@ -33,12 +33,7 @@ impl Client {
     };
 
     let resp = self.api_read_segment_deletions(&req).await?;
-    // TODO get rid of this if once core handles it instead
-    let bools = if resp.data.is_empty() {
-      Vec::new()
-    } else {
-      deletion::decompress_deletions(resp.data)?
-    };
+    let bools = deletion::decompress_deletions(resp.data)?;
     Ok(bools)
   }
 

@@ -54,7 +54,7 @@ async fn main() -> ClientResult<()> {
   // Instantiate a client
   let client = Client::from_ip_port(
     IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-    1337,
+    3841,
   );
 
   // drop table if it already exists, to clean state
