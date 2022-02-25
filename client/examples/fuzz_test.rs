@@ -230,7 +230,7 @@ async fn write_rows(i: usize, opt: &Opt, client: &Client, row_counts: &mut Vec<u
   row_counts.push(last_row_count + n_batches * n_rows_per_batch);
 
   if !small_write && rng.gen_bool(0.5) {
-    println!("waiting {} seconds for data to settle...", opt.compaction_wait_time);
+    println!("waiting {} seconds for compaction to settle...", opt.compaction_wait_time);
     tokio::time::sleep(Duration::from_secs(opt.compaction_wait_time)).await;
   }
   Ok(())

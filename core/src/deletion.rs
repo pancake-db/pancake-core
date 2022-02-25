@@ -1,12 +1,13 @@
-use crate::errors::CoreResult;
 use q_compress::{Compressor, Decompressor};
 
-pub fn compress_deletions(is_deleted: Vec<bool>) -> CoreResult<Vec<u8>> {
+use crate::errors::CoreResult;
+
+pub fn compress_deletions(is_deleted: &[bool]) -> CoreResult<Vec<u8>> {
   let compressor = Compressor::<bool>::default();
-  Ok(compressor.simple_compress(&is_deleted)?)
+  Ok(compressor.simple_compress(is_deleted))
 }
 
-pub fn decompress_deletions(bytes: Vec<u8>) -> CoreResult<Vec<bool>> {
+pub fn decompress_deletions(bytes: &[u8]) -> CoreResult<Vec<bool>> {
   if bytes.is_empty() {
     return Ok(Vec::new())
   }

@@ -1,6 +1,6 @@
 use pancake_db_idl::dml::FieldValue;
 use pancake_db_idl::dtype::DataType;
-use q_compress::TimestampMicros;
+use q_compress::data_types::TimestampMicros;
 
 pub use decoder::ByteIdx;
 pub use decoder::Decodable;
