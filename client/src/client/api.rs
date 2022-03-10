@@ -31,6 +31,15 @@ fn parse_pb_with_bytes<Resp: Message>(bytes: Vec<u8>) -> ClientResult<(Resp, Vec
   Ok((res, bytes[i + delim_bytes.len()..].to_vec()))
 }
 
+/// Raw API functionality.
+///
+/// Use this for
+/// * writing data to existing tables
+/// * creating and altering tables
+/// * reading schemas
+///
+/// For reading or deleting bulk data from PancakeDB, you'll probably want
+/// to use higher-level calls or an execution engine like Apache Spark.
 impl Client {
   /// Create a table.
   ///
@@ -191,7 +200,10 @@ impl Client {
     ).await
   }
 
-  ///  This is typically the client method you'll be using most frequently.
+  /// This is typically the client method you'll be using most frequently.
+  ///
+  /// See the [`make_row`] and [`make_partition`] macros for help constructing
+  /// the request.
   ///
   /// ```
   /// # use pancake_db_client::Client;
@@ -204,10 +216,13 @@ impl Client {
   /// let req = WriteToPartitionRequest {
   ///   table_name: "table".to_string(),
   ///   partition: make_partition! {
-  ///     "my_partition_key_0" => "val0".to_string(),
-  ///     "my_partition_key_1" => 5,
+  ///     "my_string_partition_key" => "val0".to_string(),
+  ///     "my_int_partition_key" => 5,
   ///   },
-  ///   rows: vec![],
+  ///   rows: vec![make_row! {
+  ///     "my_bool_col" => true,
+  ///     "my_bytes_col" => vec![97_u8, 98_u8],
+  ///   }],
   ///   ..Default::default()
   /// };
   /// # async { // we don't actually run this in the test, only compile

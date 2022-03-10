@@ -11,6 +11,9 @@ use crate::types::SegmentKey;
 
 use super::Client;
 
+/// Higher-level functionality.
+///
+/// Use this for bulk reads.
 impl Client {
   /// Reads the segment's deletion data.
   ///
