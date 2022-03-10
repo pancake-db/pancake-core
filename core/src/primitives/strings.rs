@@ -60,7 +60,7 @@ mod tests {
     let value_codec = String::new_value_codec(ZSTD).unwrap();
 
     let bytes = value_codec.compress(&fvs, 0)?;
-    let recovered_values = value_codec.decompress(bytes, 0)?;
+    let recovered_values = value_codec.decompress(&bytes, 0)?;
     assert_eq!(
       fvs,
       recovered_values,

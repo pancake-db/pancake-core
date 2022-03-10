@@ -1,6 +1,6 @@
 use pancake_db_idl::dml::{FieldValue, RepeatedFieldValue};
 use pancake_db_idl::dml::field_value::Value;
-use q_compress::U32Compressor;
+use q_compress::Compressor;
 
 use crate::errors::{CoreError, CoreResult};
 use crate::primitives::{Atom, Primitive};
@@ -104,8 +104,8 @@ pub fn extract_single_levels_and_atoms<P: Primitive>(
 
 pub fn compress_rep_levels(rep_levels: Vec<u8>) -> CoreResult<Vec<u8>> {
   let rep_levels = rep_levels.iter().map(|&l| l as u32).collect::<Vec<u32>>();
-  let compressor = U32Compressor::default();
-  Ok(compressor.simple_compress(&rep_levels)?)
+  let compressor = Compressor::<u32>::default();
+  Ok(compressor.simple_compress(&rep_levels))
 }
 
 pub struct AtomNester<P: Primitive> {

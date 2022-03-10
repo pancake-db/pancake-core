@@ -1,13 +1,13 @@
-use q_compress::compressor::Compressor as RawQCompressor;
-use q_compress::decompressor::Decompressor as RawQDecompressor;
-use q_compress::{CompressorConfig, TimestampMicros};
-use q_compress::types::NumberLike;
+use q_compress::Compressor as RawQCompressor;
+use q_compress::Decompressor as RawQDecompressor;
+use q_compress::CompressorConfig;
+use q_compress::data_types::{NumberLike, TimestampMicros};
 
 use crate::compression::Codec;
 use crate::errors::CoreResult;
 use crate::primitives::Primitive;
 
-const Q_MAX_DEPTH: u32 = 7;
+const Q_COMPRESSION_LEVEL: usize = 7;
 
 pub trait QCodec {
   type T: Primitive + NumberLike;
@@ -23,14 +23,15 @@ macro_rules! qcompressor {
 
       fn compress_atoms(&self, primitives: &[$primitive_type]) -> CoreResult<Vec<u8>> {
         let compressor = RawQCompressor::<$primitive_type>::from_config(CompressorConfig {
-          max_depth: Q_MAX_DEPTH,
+          compression_level: Q_COMPRESSION_LEVEL,
+          ..Default::default()
         });
-        Ok(compressor.simple_compress(primitives)?)
+        Ok(compressor.simple_compress(primitives))
       }
 
       fn decompress_atoms(&self, bytes: &[u8]) -> CoreResult<Vec<$primitive_type>> {
         let decompressor = RawQDecompressor::<$primitive_type>::default();
-        Ok(decompressor.simple_decompress(bytes.to_vec())?)
+        Ok(decompressor.simple_decompress(bytes)?)
       }
     }
   }

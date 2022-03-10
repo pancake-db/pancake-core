@@ -1,8 +1,7 @@
 use pancake_db_idl::dml::field_value::Value;
 use pancake_db_idl::dtype::DataType;
 use protobuf::well_known_types::Timestamp;
-use q_compress::TimestampMicros;
-use q_compress::types::NumberLike;
+use q_compress::data_types::{NumberLike, TimestampMicros};
 
 use crate::compression::Codec;
 use crate::compression::q_codec::TimestampMicrosQCodec;
@@ -14,26 +13,19 @@ impl Atom for TimestampMicros {
   const BYTE_SIZE: usize = 12;
 
   fn to_bytes(&self) -> Vec<u8> {
-    TimestampMicros::bytes_from(*self)
+    NumberLike::to_bytes(*self)
   }
 
   fn try_from_bytes(bytes: &[u8]) -> CoreResult<Self> {
-    Ok(TimestampMicros::from_bytes_safe(bytes)?)
+    Ok(TimestampMicros::from_bytes(bytes.to_vec())?)
   }
 }
 
 impl Primitive for TimestampMicros {
-  const DTYPE: DataType = DataType::TIMESTAMP_MICROS;
-  const IS_ATOMIC: bool = true;
-
   type A = Self;
+  const DTYPE: DataType = DataType::TIMESTAMP_MICROS;
 
-  fn try_from_value(v: &Value) -> CoreResult<TimestampMicros> {
-    match v {
-      Value::timestamp_val(res) => Ok(TimestampMicros::from_secs_and_nanos(res.seconds, res.nanos as u32)),
-      _ => Err(CoreError::invalid("cannot read timestamp from value")),
-    }
-  }
+  const IS_ATOMIC: bool = true;
 
   fn to_value(&self) -> Value {
     let mut t = Timestamp::new();
@@ -41,6 +33,13 @@ impl Primitive for TimestampMicros {
     t.seconds = secs;
     t.nanos = nanos as i32;
     Value::timestamp_val(t)
+  }
+
+  fn try_from_value(v: &Value) -> CoreResult<TimestampMicros> {
+    match v {
+      Value::timestamp_val(res) => Ok(TimestampMicros::from_secs_and_nanos(res.seconds, res.nanos as u32)),
+      _ => Err(CoreError::invalid("cannot read timestamp from value")),
+    }
   }
 
   fn to_atoms(&self) -> Vec<Self> {

@@ -1,5 +1,5 @@
 use pancake_db_idl::dtype::DataType;
-use q_compress::TimestampMicros;
+use q_compress::data_types::TimestampMicros;
 
 use crate::errors::{CoreError, CoreResult};
 use crate::primitives::Primitive;

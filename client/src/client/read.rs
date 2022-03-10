@@ -33,7 +33,7 @@ impl Client {
     };
 
     let resp = self.api_read_segment_deletions(&req).await?;
-    let bools = deletion::decompress_deletions(resp.data)?;
+    let bools = deletion::decompress_deletions(&resp.data)?;
     Ok(bools)
   }
 
@@ -94,7 +94,7 @@ impl Client {
         &codec,
       )?;
       let fvs = decompressor.decompress(
-        compressed_bytes,
+        &compressed_bytes,
         column.nested_list_depth as u8,
       )?;
       for fv in fvs {
