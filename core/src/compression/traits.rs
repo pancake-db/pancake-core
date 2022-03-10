@@ -1,5 +1,5 @@
 use pancake_db_idl::dml::FieldValue;
-use q_compress::{BitReader, Decompressor};
+use q_compress::{BitReader, BitWords, Decompressor};
 
 use crate::errors::CoreResult;
 use crate::primitives::Primitive;
@@ -34,7 +34,8 @@ impl<P: Primitive> ValueCodec for Box<dyn Codec<P=P>> {
 
   fn decompress_rep_levels(&self, bytes: &[u8]) -> CoreResult<RepLevelsAndBytes> {
     let decompressor = Decompressor::<u32>::default();
-    let mut reader = BitReader::from(bytes);
+    let words = BitWords::from(bytes);
+    let mut reader = BitReader::from(&words);
     let flags = decompressor.header(&mut reader)?;
     let mut rep_levels = Vec::new();
     while let Some(chunk) = decompressor.chunk(&mut reader, &flags)? {
