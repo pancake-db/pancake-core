@@ -1,18 +1,24 @@
 use std::collections::HashMap;
 
-use pancake_db_idl::dml::{FieldValue, ReadSegmentColumnRequest, ReadSegmentDeletionsRequest, Row};
-use pancake_db_idl::schema::ColumnMeta;
-
 use pancake_db_core::compression;
 use pancake_db_core::deletion;
 use pancake_db_core::encoding;
+use pancake_db_idl::dml::{FieldValue, ReadSegmentColumnRequest, ReadSegmentDeletionsRequest, Row};
+use pancake_db_idl::schema::ColumnMeta;
 
 use crate::errors::{ClientError, ClientResult};
+use crate::types::SegmentKey;
 
 use super::Client;
-use super::types::SegmentKey;
 
+/// Higher-level functionality.
+///
+/// Use this for bulk reads.
 impl Client {
+  /// Reads the segment's deletion data.
+  ///
+  /// Typically you'll want to use the higher-level
+  /// [`decode_segment`][Client::decode_segment] instead.
   pub async fn decode_is_deleted(
     &self,
     segment_key: &SegmentKey,
@@ -37,6 +43,10 @@ impl Client {
     Ok(bools)
   }
 
+  /// Reads the segment column, following continuation tokens.
+  ///
+  /// Typically you'll want to use the higher-level
+  /// [`decode_segment`][Client::decode_segment] instead.
   pub async fn decode_segment_column(
     &self,
     segment_key: &SegmentKey,
@@ -128,6 +138,7 @@ impl Client {
     Ok(res)
   }
 
+  /// Reads multiple columns for the same segment and applies deletion data.
   pub async fn decode_segment(
     &self,
     segment_key: &SegmentKey,
@@ -139,7 +150,7 @@ impl Client {
       ))
     }
 
-    let correlation_id = super::new_correlation_id();
+    let correlation_id = crate::utils::new_correlation_id();
 
     let is_deleted = self.decode_is_deleted(segment_key, &correlation_id).await?;
 

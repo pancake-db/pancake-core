@@ -2,10 +2,9 @@ use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 
 use futures::StreamExt;
-use pancake_db_idl::dml::partition_field_value::Value as PartitionValue;
+use hyper::StatusCode;
 use pancake_db_idl::ddl::{CreateTableRequest, DropTableRequest, GetSchemaRequest};
-use pancake_db_idl::dml::{DeleteFromSegmentRequest, FieldValue, ListSegmentsRequest, PartitionFieldValue, RepeatedFieldValue, Row, WriteToPartitionRequest, Segment};
-use pancake_db_idl::dml::field_value::Value;
+use pancake_db_idl::dml::{DeleteFromSegmentRequest, ListSegmentsRequest, Segment, WriteToPartitionRequest};
 use pancake_db_idl::dtype::DataType;
 use pancake_db_idl::partition_dtype::PartitionDataType;
 use pancake_db_idl::schema::{ColumnMeta, PartitionMeta, Schema};
@@ -13,9 +12,8 @@ use protobuf::{MessageField, ProtobufEnumOrUnknown};
 use rand::Rng;
 use tokio;
 
-use pancake_db_client::{Client, SegmentKey};
-use pancake_db_client::errors::{ClientResult, ClientErrorKind};
-use hyper::StatusCode;
+use pancake_db_client::{Client, make_partition, make_row, SegmentKey};
+use pancake_db_client::errors::{ClientErrorKind, ClientResult};
 
 const TABLE_NAME: &str = "client_runthrough_table";
 const N_PARTITIONS: i64 = 3;
@@ -86,48 +84,6 @@ async fn main() -> ClientResult<()> {
   // Write rows
   // you can put up to 256 rows into one request for efficiency,
   // but here we use just 2 for demonstration purposes
-  let mut rows = Vec::new();
-  let list_of_strings = Value::list_val(RepeatedFieldValue {
-    vals: vec![
-      FieldValue {
-        value: Some(Value::string_val("item 0".to_string())),
-        ..Default::default()
-      },
-      FieldValue {
-        value: Some(Value::string_val("item 1".to_string())),
-        ..Default::default()
-      },
-    ],
-    ..Default::default()
-  });
-  let mut basic_fields = HashMap::new();
-  basic_fields.insert(
-    "i".to_string(),
-    FieldValue {
-      value: Some(Value::int64_val(33)),
-      ..Default::default()
-    }
-  );
-  basic_fields.insert(
-    "s".to_string(),
-    FieldValue {
-      value: Some(list_of_strings),
-      ..Default::default()
-    }
-  );
-  rows.push(
-    Row {
-      fields: basic_fields,
-      ..Default::default()
-    },
-  );
-  rows.push(Row::new()); // a row full of nulls
-  let write_to_partition_req = WriteToPartitionRequest {
-    table_name: TABLE_NAME.to_string(),
-    rows,
-    ..Default::default()
-  };
-
   // limit the number of concurrent write futures
   // server configuration might limit this and refuse connections after a point
   let max_concurrency = 16;
@@ -135,12 +91,22 @@ async fn main() -> ClientResult<()> {
     .for_each_concurrent(
       max_concurrency,
       |_| async {
-        let mut req = write_to_partition_req.clone();
+        let rows = vec![
+          make_row! {},
+          make_row! {
+            "i" => 33,
+            "s" => vec!["item 0".to_string(), "item 1".to_string()],
+          },
+        ];
         let mut rng = rand::thread_rng();
-        req.partition.insert("pk".to_string(), PartitionFieldValue {
-          value: Some(PartitionValue::int64_val(rng.gen_range(0..N_PARTITIONS))),
+        let req = WriteToPartitionRequest {
+          table_name: TABLE_NAME.to_string(),
+          rows,
+          partition: make_partition! {
+            "pk" => rng.gen_range(0..N_PARTITIONS)
+          },
           ..Default::default()
-        });
+        };
         client.api_write_to_partition(&req).await.expect("write failed");
       }
     )

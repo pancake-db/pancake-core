@@ -8,7 +8,7 @@ use protobuf::json::{ParseError, PrintError};
 
 use pancake_db_core::errors::CoreError;
 
-pub trait OtherUpcastable: std::error::Error {}
+trait OtherUpcastable: std::error::Error {}
 impl OtherUpcastable for FromUtf8Error {}
 impl OtherUpcastable for hyper::Error {}
 impl OtherUpcastable for InvalidUri {}
