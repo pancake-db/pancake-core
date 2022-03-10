@@ -429,7 +429,6 @@ dependencies = [
  "pancake-db-core 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "pancake-db-idl",
  "protobuf",
- "q_compress",
  "rand",
  "structopt",
  "tokio",
