@@ -12,6 +12,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-stream"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "171374e7e3b2504e0e5236e3b59260560f9fe94bfe9ac39ba5e4e929c5590625"
+dependencies = [
+ "async-stream-impl",
+ "futures-core",
+]
+
+[[package]]
+name = "async-stream-impl"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "648ed8c8d2ce5409ccd57453d9d1b214b342a0d69376a6feda1fd6cae3299308"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -401,29 +422,19 @@ checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
 
 [[package]]
 name = "pancake-db-client"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "futures",
  "hyper",
- "pancake-db-core 0.1.1",
+ "pancake-db-core 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "pancake-db-idl",
  "protobuf",
+ "q_compress",
  "rand",
  "structopt",
  "tokio",
+ "tokio-test",
  "uuid",
-]
-
-[[package]]
-name = "pancake-db-core"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52b8af99d2388ac76ffc6b012e83ac2115f6342050e5688a2fede60e1dad197d"
-dependencies = [
- "pancake-db-idl",
- "protobuf",
- "q_compress 0.7.0",
- "zstd",
 ]
 
 [[package]]
@@ -432,7 +443,19 @@ version = "0.1.2"
 dependencies = [
  "pancake-db-idl",
  "protobuf",
- "q_compress 0.9.0",
+ "q_compress",
+ "zstd",
+]
+
+[[package]]
+name = "pancake-db-core"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "963e09092f4fbe695ee2e1b9181960c3339f8bc636ecb0a6d17c3bbf4ca6e7b4"
+dependencies = [
+ "pancake-db-idl",
+ "protobuf",
+ "q_compress",
  "zstd",
 ]
 
@@ -538,12 +561,6 @@ name = "protobuf"
 version = "3.0.0-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d5ef59c35c7472ce5e1b6c5924b87585143d1fc2cf39eae0009bba6c4df62f1"
-
-[[package]]
-name = "q_compress"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b00bc41cea97abceaece6d5be978d7179591f1931bd2f8812104718ffae1bc16"
 
 [[package]]
 name = "q_compress"
@@ -725,6 +742,30 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tokio-stream"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50145484efff8818b5ccd256697f36863f587da82cf8b409c53adf1e840798e3"
+dependencies = [
+ "futures-core",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-test"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53474327ae5e166530d17f2d956afcb4f8a004de581b3cae10f12006bc8163e3"
+dependencies = [
+ "async-stream",
+ "bytes",
+ "futures-core",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

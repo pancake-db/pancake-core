@@ -1,25 +1,30 @@
 use std::net::IpAddr;
 
-use hyper::{Body, Client as HClient, Method, StatusCode, Request};
+use hyper::{Body, Client as HClient, Method, Request, StatusCode};
 use hyper::body::HttpBody;
 use hyper::client::HttpConnector;
 use protobuf::Message;
 
 use crate::errors::{ClientError, ClientResult};
-use uuid::Uuid;
 
 mod api;
 mod read;
-pub mod types;
 
+/// The best way to communicate with a PancakeDB server from Rust.
+///
+/// Supports the PancakeDB API.
+/// Additionally, since PancakeDB reads return raw byte data in a compressed
+/// format, `Client` supports some higher-level functionality for reading
+/// whole segments into a meaningful representation.
 #[derive(Clone, Debug)]
 pub struct Client {
-  pub ip: IpAddr,
-  pub port: u16,
-  pub h_client: HClient<HttpConnector>,
+  ip: IpAddr,
+  port: u16,
+  h_client: HClient<HttpConnector>,
 }
 
 impl Client {
+  /// Creates a new client, given an IP and port.
   pub fn from_ip_port(ip: IpAddr, port: u16) -> Self {
     let h_client = HClient::new();
     Client {
@@ -78,8 +83,3 @@ impl Client {
     Ok(res)
   }
 }
-
-pub fn new_correlation_id() -> String {
-  Uuid::new_v4().to_string()
-}
-

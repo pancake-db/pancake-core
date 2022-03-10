@@ -1,3 +1,3 @@
 # Client
 
-See [client documentation](./client/README.md).
+See [the client README](./client/README.md).
