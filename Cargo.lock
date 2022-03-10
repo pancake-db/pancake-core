@@ -405,7 +405,7 @@ version = "0.1.1"
 dependencies = [
  "futures",
  "hyper",
- "pancake-db-core 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pancake-db-core 0.1.1",
  "pancake-db-idl",
  "protobuf",
  "rand",
@@ -417,22 +417,22 @@ dependencies = [
 [[package]]
 name = "pancake-db-core"
 version = "0.1.1"
-dependencies = [
- "pancake-db-idl",
- "protobuf",
- "q_compress",
- "zstd",
-]
-
-[[package]]
-name = "pancake-db-core"
-version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52b8af99d2388ac76ffc6b012e83ac2115f6342050e5688a2fede60e1dad197d"
 dependencies = [
  "pancake-db-idl",
  "protobuf",
- "q_compress",
+ "q_compress 0.7.0",
+ "zstd",
+]
+
+[[package]]
+name = "pancake-db-core"
+version = "0.1.2"
+dependencies = [
+ "pancake-db-idl",
+ "protobuf",
+ "q_compress 0.9.0",
  "zstd",
 ]
 
@@ -544,6 +544,12 @@ name = "q_compress"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b00bc41cea97abceaece6d5be978d7179591f1931bd2f8812104718ffae1bc16"
+
+[[package]]
+name = "q_compress"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95e8bd2f301b27c44c2bef1302168bc400c6fe530ed0355cf04501e34bbe256b"
 
 [[package]]
 name = "quote"
