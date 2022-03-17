@@ -1,22 +1,19 @@
 use std::collections::{HashMap, HashSet};
-use std::net::{IpAddr, Ipv4Addr};
 
 use futures::StreamExt;
-use hyper::StatusCode;
+use pancake_db_client::{Client, SegmentKey};
+use pancake_db_client::errors::{ClientError, ClientResult, ClientErrorKind};
 use pancake_db_idl::ddl::{AlterTableRequest, CreateTableRequest, DropTableRequest, GetSchemaRequest};
 use pancake_db_idl::ddl::create_table_request::SchemaMode;
-use pancake_db_idl::dml::{FieldValue, ListSegmentsRequest, Row, WriteToPartitionRequest, DeleteFromSegmentRequest};
+use pancake_db_idl::dml::{DeleteFromSegmentRequest, FieldValue, ListSegmentsRequest, Row, WriteToPartitionRequest};
 use pancake_db_idl::dml::field_value::Value;
 use pancake_db_idl::dtype::DataType;
 use pancake_db_idl::schema::{ColumnMeta, Schema};
-use protobuf::{MessageField, ProtobufEnumOrUnknown};
 use rand::Rng;
 use structopt::StructOpt;
 use tokio;
 use tokio::time::Duration;
-
-use pancake_db_client::{Client, SegmentKey};
-use pancake_db_client::errors::{ClientError, ClientErrorKind, ClientResult};
+use tonic::Code;
 
 const TABLE_NAME: &str = "fuzz_test_table";
 const BATCH_SIZE: usize = 250;
@@ -52,13 +49,10 @@ impl Opt {
 #[tokio::main]
 async fn main() -> ClientResult<()> {
   // Instantiate a client
-  let client = Client::from_ip_port(
-    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-    3841,
-  );
+  let mut client = Client::connect("http://localhost:3842").await?;
 
   // drop table if it already exists, to clean state
-  let drop_table_res = client.api_drop_table(&DropTableRequest {
+  let drop_table_res = client.drop_table(DropTableRequest {
     table_name: TABLE_NAME.to_string(),
     ..Default::default()
   }).await;
@@ -69,7 +63,7 @@ async fn main() -> ClientResult<()> {
     },
     Err(err) => {
       match err.kind {
-        ClientErrorKind::Http(StatusCode::NOT_FOUND) => Ok(()),
+        ClientErrorKind::Grpc { code: Code::NotFound } => Ok(()),
         _ => Err(err),
       }
     }
@@ -80,7 +74,7 @@ async fn main() -> ClientResult<()> {
   initial_columns.insert(
     "col_0".to_string(),
     ColumnMeta {
-      dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
+      dtype: DataType::Int64 as i32,
       ..Default::default()
     }
   );
@@ -90,10 +84,10 @@ async fn main() -> ClientResult<()> {
   };
   let create_table_req = CreateTableRequest {
     table_name: TABLE_NAME.to_string(),
-    schema: MessageField::some(schema.clone()),
+    schema: Some(schema.clone()),
     ..Default::default()
   };
-  let create_resp = client.api_create_table(&create_table_req).await?;
+  let create_resp = client.create_table(create_table_req).await?;
   println!("Created table for the first time: {:?}", create_resp);
 
   let opt: Opt = Opt::from_args();
@@ -103,17 +97,17 @@ async fn main() -> ClientResult<()> {
   let mut row_counts = vec![0, 0]; // expected row counts after each schema evolution
   let mut n_deletions_ub = 0;
   for iter in 1..opt.num_evolutions + 1 {
-    iterate(iter, &mut schema, &opt, &client, &mut row_counts, &mut n_deletions_ub).await?;
+    iterate(iter, &mut schema, &opt, client.clone(), &mut row_counts, &mut n_deletions_ub).await?;
   }
 
   Ok(())
 }
 
-async fn iterate(i: usize, schema: &mut Schema, opt: &Opt, client: &Client, row_counts: &mut Vec<usize>, n_deletions_ub: &mut usize) -> ClientResult<()> {
-  evolve_schema(i, schema, client).await?;
-  let write_rows_future = write_rows(i, opt, client, row_counts);
+async fn iterate(i: usize, schema: &mut Schema, opt: &Opt, client: Client, row_counts: &mut Vec<usize>, n_deletions_ub: &mut usize) -> ClientResult<()> {
+  evolve_schema(i, schema, client.clone()).await?;
+  let write_rows_future = write_rows(i, opt, client.clone(), row_counts);
   if i > 1 {
-    let delete_future = delete(opt, client, n_deletions_ub);
+    let delete_future = delete(opt, client.clone(), n_deletions_ub);
     let (write_rows_res, delete_res) = tokio::join!(
       write_rows_future,
       delete_future,
@@ -127,10 +121,10 @@ async fn iterate(i: usize, schema: &mut Schema, opt: &Opt, client: &Client, row_
   Ok(())
 }
 
-async fn evolve_schema(i: usize, schema: &mut Schema, client: &Client) -> ClientResult<()> {
+async fn evolve_schema(i: usize, schema: &mut Schema, mut client: Client) -> ClientResult<()> {
   let new_column_name = format!("col_{}", i);
   let new_column = ColumnMeta {
-    dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
+    dtype: DataType::Int64 as i32,
     ..Default::default()
   };
   schema.columns.insert(new_column_name.clone(), new_column.clone());
@@ -146,16 +140,16 @@ async fn evolve_schema(i: usize, schema: &mut Schema, client: &Client) -> Client
       ..Default::default()
     };
     println!("altering table: {:?}", alter_req);
-    client.api_alter_table(&alter_req).await?;
+    client.alter_table(alter_req).await?;
   } else {
     let create_req = CreateTableRequest {
       table_name: TABLE_NAME.to_string(),
-      schema: MessageField::some(schema.clone()),
-      mode: ProtobufEnumOrUnknown::new(SchemaMode::ADD_NEW_COLUMNS),
+      schema: Some(schema.clone()),
+      mode: SchemaMode::AddNewColumns as i32,
       ..Default::default()
     };
     println!("declaratively creating table: {:?}", create_req);
-    client.api_create_table(&create_req).await?;
+    client.create_table(create_req).await?;
   }
 
   // check that schema is as expected
@@ -163,7 +157,9 @@ async fn evolve_schema(i: usize, schema: &mut Schema, client: &Client) -> Client
     table_name: TABLE_NAME.to_string(),
     ..Default::default()
   };
-  let resp = client.api_get_schema(&get_schema_req).await.expect("getting schema failed");
+  let resp = client.get_schema(get_schema_req)
+    .await
+    .expect("getting schema failed");
   let resp_schema = resp.schema.unwrap();
   if &resp_schema != schema {
     return Err(ClientError::other(format!(
@@ -176,7 +172,7 @@ async fn evolve_schema(i: usize, schema: &mut Schema, client: &Client) -> Client
   Ok(())
 }
 
-async fn write_rows(i: usize, opt: &Opt, client: &Client, row_counts: &mut Vec<usize>) -> ClientResult<()> {
+async fn write_rows(i: usize, opt: &Opt, client: Client, row_counts: &mut Vec<usize>) -> ClientResult<()> {
   let mut rng = rand::thread_rng();
   let last_row_count = *row_counts.last().unwrap();
   let small_write = rng.gen_bool(0.5);
@@ -188,13 +184,13 @@ async fn write_rows(i: usize, opt: &Opt, client: &Client, row_counts: &mut Vec<u
 
   let mut rows = Vec::with_capacity(n_rows_per_batch);
   for _ in 0..n_rows_per_batch {
-    let mut row = Row::new();
+    let mut row = Row::default();
     for col_idx in 0..i + 1 {
       if rng.gen_bool(0.5) {
         row.fields.insert(
           format!("col_{}", col_idx),
           FieldValue {
-            value: Some(Value::int64_val(rng.gen())),
+            value: Some(Value::Int64Val(rng.gen())),
             ..Default::default()
           }
         );
@@ -221,7 +217,9 @@ async fn write_rows(i: usize, opt: &Opt, client: &Client, row_counts: &mut Vec<u
     .for_each_concurrent(
       max_concurrency,
       |_| async {
-        client.api_write_to_partition(&write_to_partition_req).await.expect("write failed");
+        client.clone().write_to_partition(write_to_partition_req.clone())
+          .await
+          .expect("write failed");
       }
     )
     .await;
@@ -236,9 +234,9 @@ async fn write_rows(i: usize, opt: &Opt, client: &Client, row_counts: &mut Vec<u
   Ok(())
 }
 
-async fn delete(opt: &Opt, client: &Client, n_deletions_ub: &mut usize) -> ClientResult<()> {
+async fn delete(opt: &Opt, mut client: Client, n_deletions_ub: &mut usize) -> ClientResult<()> {
   println!("listing segments for deletion");
-  let list_segments_response = client.api_list_segments(&ListSegmentsRequest {
+  let list_segments_response = client.list_segments(ListSegmentsRequest {
     table_name: TABLE_NAME.to_string(),
     include_metadata: true,
     ..Default::default()
@@ -261,18 +259,18 @@ async fn delete(opt: &Opt, client: &Client, n_deletions_ub: &mut usize) -> Clien
     ..Default::default()
   };
   *n_deletions_ub += opt.max_deletions_per_req;
-  client.api_delete_from_segment(&req).await?;
+  client.delete_from_segment(req).await?;
   Ok(())
 }
 
-async fn assert_reads(i: usize, client: &Client, row_counts: &[usize], n_deletions_ub: usize) -> ClientResult<()> {
+async fn assert_reads(i: usize, mut client: Client, row_counts: &[usize], n_deletions_ub: usize) -> ClientResult<()> {
   // List segments
   let list_req = ListSegmentsRequest {
     table_name: TABLE_NAME.to_string(),
     ..Default::default()
   };
   println!("listing segments: {:?}", list_req);
-  let list_resp = client.api_list_segments(&list_req).await?;
+  let list_resp = client.list_segments(list_req).await?;
 
   // Read segments
   let current_row_count = *row_counts.last().unwrap();
@@ -290,10 +288,13 @@ async fn assert_reads(i: usize, client: &Client, row_counts: &[usize], n_deletio
       segment_id: segment.segment_id.clone(),
     };
     let correlation_id = pancake_db_client::new_correlation_id();
-    let is_deleted = client.decode_is_deleted(&segment_key, &correlation_id).await?;
+    let is_deleted = client.decode_is_deleted(
+      &segment_key,
+      &correlation_id,
+    ).await?;
     for col_idx in 0..i + 1 {
       let col_meta = ColumnMeta {
-        dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
+        dtype: DataType::Int64 as i32,
         ..Default::default()
       };
       let col_name = format!("col_{}", col_idx);

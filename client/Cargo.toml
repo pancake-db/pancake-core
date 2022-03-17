@@ -12,11 +12,11 @@ license = "Apache-2.0"
 repository = "https://github.com/pancake-db/pancake-core/"
 
 [dependencies]
-hyper = {version="0.14.9", features=["full"]}
-pancake-db-core = "0.1.2"
-pancake-db-idl = {path="../../pancake-idl/temp"}
-protobuf = "=3.0.0-alpha.2"
+pancake-db-core = {path="../core"}
+pancake-db-idl = {path="../../pancake-idl/temp", features=["service"]}
+prost-types = "0.9.0"
 tokio = {version="1.2.0", features=["macros"]}
+tonic = "0.6.2"
 uuid = {version="0.8.2", features=["v4"]}
 
 [dev-dependencies]

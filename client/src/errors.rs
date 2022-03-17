@@ -2,17 +2,12 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::string::FromUtf8Error;
 
-use hyper::http::uri::InvalidUri;
-use hyper::StatusCode;
-use protobuf::json::{ParseError, PrintError};
-
+use tonic::{Code, Status};
 use pancake_db_core::errors::CoreError;
 
 trait OtherUpcastable: std::error::Error {}
 impl OtherUpcastable for FromUtf8Error {}
-impl OtherUpcastable for hyper::Error {}
-impl OtherUpcastable for InvalidUri {}
-impl OtherUpcastable for hyper::http::Error {}
+impl OtherUpcastable for CoreError {}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClientError {
@@ -22,14 +17,18 @@ pub struct ClientError {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ClientErrorKind {
-  Http(StatusCode),
+  Connection,
+  Grpc {
+    code: Code,
+  },
   Other,
 }
 
 impl Display for ClientErrorKind {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     let s = match &self {
-      ClientErrorKind::Http(status) => format!("HTTP error {}", status),
+      ClientErrorKind::Connection => "connection error".to_string(),
+      ClientErrorKind::Grpc { code } => format!("GRPC error {}", code),
       ClientErrorKind::Other => "client-side error".to_string(),
     };
     f.write_str(&s)
@@ -37,15 +36,6 @@ impl Display for ClientErrorKind {
 }
 
 impl ClientError {
-  pub fn http(status: StatusCode, resp_bytes: Vec<u8>) -> Self {
-    let message = String::from_utf8(resp_bytes)
-      .unwrap_or_else(|_| "<unparseable bytes>".to_string());
-    ClientError {
-      message,
-      kind: ClientErrorKind::Http(status)
-    }
-  }
-
   pub fn other(message: String) -> Self {
     ClientError {
       message,
@@ -74,29 +64,20 @@ impl<T> From<T> for ClientError where T: OtherUpcastable {
   }
 }
 
-impl From<PrintError> for ClientError {
-  fn from(e: PrintError) -> ClientError {
+impl From<tonic::transport::Error> for ClientError {
+  fn from(err: tonic::transport::Error) -> Self {
     ClientError {
-      message: format!("{:?}", e),
-      kind: ClientErrorKind::Other,
+      message: err.to_string(),
+      kind: ClientErrorKind::Connection,
     }
   }
 }
 
-impl From<ParseError> for ClientError {
-  fn from(e: ParseError) -> ClientError {
+impl From<Status> for ClientError {
+  fn from(status: Status) -> Self {
     ClientError {
-      message: format!("{:?}", e),
-      kind: ClientErrorKind::Other,
-    }
-  }
-}
-
-impl From<CoreError> for ClientError {
-  fn from(e: CoreError) -> ClientError {
-    ClientError {
-      message: e.to_string(),
-      kind: ClientErrorKind::Other,
+      message: status.message().to_string(),
+      kind: ClientErrorKind::Grpc { code: status.code(), },
     }
   }
 }

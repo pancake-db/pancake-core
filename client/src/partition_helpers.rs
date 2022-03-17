@@ -1,8 +1,8 @@
+use std::time::SystemTime;
 use pancake_db_idl::dml::partition_field_value::Value;
-use protobuf::well_known_types::Timestamp;
-
 /// Re-export for the purpose of [`make_partition`].
 pub use pancake_db_idl::dml::PartitionFieldValue;
+use prost_types::Timestamp;
 
 /// Trait used by [`make_partition`] to convert native types to Pancake IDL types.
 pub trait PartitionFieldValueConverter {
@@ -11,25 +11,25 @@ pub trait PartitionFieldValueConverter {
 
 impl PartitionFieldValueConverter for i64 {
   fn to_value(self) -> Value {
-    Value::int64_val(self)
+    Value::Int64Val(self)
   }
 }
 
 impl PartitionFieldValueConverter for bool {
   fn to_value(self) -> Value {
-    Value::bool_val(self)
+    Value::BoolVal(self)
   }
 }
 
 impl PartitionFieldValueConverter for String {
   fn to_value(self) -> Value {
-    Value::string_val(self)
+    Value::StringVal(self)
   }
 }
 
-impl PartitionFieldValueConverter for Timestamp {
+impl PartitionFieldValueConverter for SystemTime {
   fn to_value(self) -> Value {
-    Value::timestamp_val(self)
+    Value::TimestampVal(Timestamp::from(self))
   }
 }
 
@@ -40,7 +40,6 @@ macro_rules! make_partition_insert {
   {$partition: expr; $key:expr => $val:expr $(,$keys:expr => $vals:expr)* $(,)?} => {
     let fv = $crate::partition_helpers::PartitionFieldValue {
       value: Some($crate::partition_helpers::PartitionFieldValueConverter::to_value($val)),
-      ..Default::default()
     };
     $partition.insert($key.to_string(), fv);
     $crate::make_partition_insert! { $partition; $($keys => $vals),* }
@@ -55,10 +54,10 @@ macro_rules! make_partition_insert {
 ///
 /// ```
 /// use pancake_db_client::make_partition;
-/// use protobuf::well_known_types::Timestamp;
+/// use std::time::SystemTime;
 ///
 /// let my_partition = make_partition! {
-///   "t" => Timestamp::now(),
+///   "t" => SystemTime::now(),
 ///   "action" => "click".to_string(),
 ///   "is_final" => true,
 ///   "int_bucket" => 7,
@@ -84,22 +83,23 @@ macro_rules! make_partition {
 #[cfg(test)]
 mod tests {
   use std::collections::HashMap;
+  use std::time::SystemTime;
+
   use pancake_db_idl::dml::partition_field_value::Value;
   use pancake_db_idl::dml::PartitionFieldValue;
-
-  use protobuf::well_known_types::Timestamp;
+  use prost_types::Timestamp;
 
   use crate::make_partition;
 
   #[test]
   fn test_partition_macro() {
-    let proto_t = Timestamp::now();
+    let timestamp = SystemTime::now();
     let p0 = make_partition! {};
     let p1 = make_partition! { "i64" => 5_i64 };
     let p2 = make_partition! {
       "i64" => 5_i64,
       "bool" => true,
-      "timestamp" => proto_t.clone(),
+      "timestamp" => timestamp.clone(),
       "string" => "asdf".to_string(),
     };
 
@@ -111,13 +111,12 @@ mod tests {
     fn assert_val_eq(partition: &HashMap<String, PartitionFieldValue>, key: &str, value: Value) {
       assert_eq!(partition[key].clone(), PartitionFieldValue {
         value: Some(value),
-        ..Default::default()
       });
     }
-    assert_val_eq(&p2, "i64", Value::int64_val(5));
-    assert_val_eq(&p2, "bool", Value::bool_val(true));
-    assert_val_eq(&p2, "timestamp", Value::timestamp_val(proto_t.clone()));
-    assert_val_eq(&p2, "string", Value::string_val("asdf".to_string()));
+    assert_val_eq(&p2, "i64", Value::Int64Val(5));
+    assert_val_eq(&p2, "bool", Value::BoolVal(true));
+    assert_val_eq(&p2, "timestamp", Value::TimestampVal(Timestamp::from(timestamp.clone())));
+    assert_val_eq(&p2, "string", Value::StringVal("asdf".to_string()));
   }
 }
 

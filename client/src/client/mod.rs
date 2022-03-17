@@ -1,85 +1,132 @@
-use std::net::IpAddr;
+use pancake_db_idl::ddl::*;
+use pancake_db_idl::dml::*;
+use pancake_db_idl::service::pancake_db_client::PancakeDbClient;
+use tonic::codegen::StdError;
+use tonic::transport::Channel;
 
-use hyper::{Body, Client as HClient, Method, Request, StatusCode};
-use hyper::body::HttpBody;
-use hyper::client::HttpConnector;
-use protobuf::Message;
+use crate::errors::ClientResult;
 
-use crate::errors::{ClientError, ClientResult};
-
-mod api;
 mod read;
 
 /// The best way to communicate with a PancakeDB server from Rust.
 ///
-/// Supports the PancakeDB API.
+/// Supports the entire PancakeDB API.
 /// Additionally, since PancakeDB reads return raw byte data in a compressed
 /// format, `Client` supports some higher-level functionality for reading
 /// whole segments into a meaningful representation.
+///
+/// ```
+/// use pancake_db_client::Client;
+/// # use pancake_db_client::errors::ClientError;
+///
+/// # async { // we don't actually run this in the test, only compile
+/// let client = Client::connect("http://localhost:3842").await?;
+/// # Ok::<(), ClientError>(())
+/// # };
+/// ```
 #[derive(Clone, Debug)]
 pub struct Client {
-  ip: IpAddr,
-  port: u16,
-  h_client: HClient<HttpConnector>,
+  pub grpc: PancakeDbClient<Channel>,
 }
 
 impl Client {
-  /// Creates a new client, given an IP and port.
-  pub fn from_ip_port(ip: IpAddr, port: u16) -> Self {
-    let h_client = HClient::new();
-    Client {
-      ip,
-      port,
-      h_client,
-    }
+  /// Creates a new client connected to the given endpoint.
+  ///
+  /// See [`tonic::transport::Endpoint`] for what qualifies as an endpoint.
+  /// One option is a string of format `"http://$HOST:$PORT"`
+  pub async fn connect<D>(dst: D) -> ClientResult<Self> where
+    D: std::convert::TryInto<tonic::transport::Endpoint>,
+    D::Error: Into<StdError>,
+  {
+    let grpc = PancakeDbClient::connect(dst).await?;
+    Ok(Client { grpc })
   }
 
-  fn rest_endpoint(&self, name: &str) -> String {
-    format!("http://{}:{}/rest/{}", self.ip, self.port, name)
+  /// Alters a table, e.g. by adding columns.
+  pub async fn alter_table(&mut self, req: AlterTableRequest) -> ClientResult<AlterTableResponse> {
+    let resp = self.grpc.alter_table(req).await?.into_inner();
+    Ok(resp)
   }
 
-  async fn simple_json_request_bytes<Req: Message>(
-    &self,
-    endpoint_name: &str,
-    method: Method,
-    req: &Req
-  ) -> ClientResult<Vec<u8>> {
-    let uri = self.rest_endpoint(endpoint_name);
-    let pb_str = protobuf::json::print_to_string(req)?;
-
-    let http_req = Request::builder()
-      .method(method)
-      .uri(&uri)
-      .header("Content-Type", "application/json")
-      .body(Body::from(pb_str))?;
-    let mut resp = self.h_client.request(http_req).await?;
-    let status = resp.status();
-    let mut content = Vec::new();
-    while let Some(chunk) = resp.body_mut().data().await {
-      content.extend(chunk?.to_vec());
-    }
-
-    if status != StatusCode::OK {
-      return Err(ClientError::http(status, content));
-    }
-    Ok(content)
+  /// Creates or asserts or declaratively updates a table.
+  pub async fn create_table(&mut self, req: CreateTableRequest) -> ClientResult<CreateTableResponse> {
+    let resp = self.grpc.create_table(req).await?.into_inner();
+    Ok(resp)
   }
 
-  async fn simple_json_request<Req: Message, Resp: Message>(
-    &self,
-    endpoint_name: &str,
-    method: Method,
-    req: &Req
-  ) -> ClientResult<Resp> {
-    let bytes = self.simple_json_request_bytes(
-      endpoint_name,
-      method,
-      req
-    ).await?;
+  /// Drops a table, deleting all its data.
+  pub async fn drop_table(&mut self, req: DropTableRequest) -> ClientResult<DropTableResponse> {
+    let resp = self.grpc.drop_table(req).await?.into_inner();
+    Ok(resp)
+  }
 
-    let content = String::from_utf8(bytes)?;
-    let mut res = Resp::new();
-    protobuf::json::merge_from_str(&mut res, &content)?;
-    Ok(res)
+  /// Returns the table's schema.
+  pub async fn get_schema(&mut self, req: GetSchemaRequest) -> ClientResult<GetSchemaResponse> {
+    let resp = self.grpc.get_schema(req).await?.into_inner();
+    Ok(resp)
+  }
+
+  /// Deletes specific rows from the segment.
+  pub async fn delete_from_segment(&mut self, req: DeleteFromSegmentRequest) -> ClientResult<DeleteFromSegmentResponse> {
+    let resp = self.grpc.delete_from_segment(req).await?.into_inner();
+    Ok(resp)
+  }
+
+  /// Lists of all tables.
+  pub async fn list_tables(&mut self, req: ListTablesRequest) -> ClientResult<ListTablesResponse> {
+    let resp = self.grpc.list_tables(req).await?.into_inner();
+    Ok(resp)
+  }
+
+  /// Lists all segments in the table, optionally subject to a partition
+  /// filter.
+  pub async fn list_segments(&mut self, req: ListSegmentsRequest) -> ClientResult<ListSegmentsResponse> {
+    let resp = self.grpc.list_segments(req).await?.into_inner();
+    Ok(resp)
+  }
+
+  /// Reads the binary data for a single column of a single segment.
+  ///
+  /// Uncommonly used; you should typically use
+  /// [`Client::decode_segment`] instead.
+  pub async fn read_segment_column(&mut self, req: ReadSegmentColumnRequest) -> ClientResult<ReadSegmentColumnResponse> {
+    let resp = self.grpc.read_segment_column(req).await?.into_inner();
+    Ok(resp)
+  }
+
+  /// Reads the binary data for the rows deleted.
+  ///
+  /// Uncommonly used; you should typically use
+  /// [`Client::decode_segment`] instead.
+  pub async fn read_segment_deletions(&mut self, req: ReadSegmentDeletionsRequest) -> ClientResult<ReadSegmentDeletionsResponse> {
+    let resp = self.grpc.read_segment_deletions(req).await?.into_inner();
+    Ok(resp)
+  }
+
+  /// Writes rows to a partition of a table.
+  ///
+  /// The request can be easily constructed with macros:
+  /// ```
+  /// use std::time::SystemTime;
+  /// use pancake_db_idl::dml::WriteToPartitionRequest;
+  /// use pancake_db_client::{make_row, make_partition};
+  ///
+  /// let req = WriteToPartitionRequest {
+  ///   table_name: "my_table".to_string(),
+  ///   partition: make_partition! {
+  ///     "string_partition_col" => "my_partition_value".to_string(),
+  ///     "int_partition_col" => 77,
+  ///   },
+  ///   rows: vec![
+  ///     make_row! {
+  ///       "timestamp_col" => SystemTime::now(),
+  ///       "bool_col" => false,
+  ///     }
+  ///   ],
+  /// };
+  /// ```
+  pub async fn write_to_partition(&mut self, req: WriteToPartitionRequest) -> ClientResult<WriteToPartitionResponse> {
+    let resp = self.grpc.write_to_partition(req).await?.into_inner();
+    Ok(resp)
   }
 }
