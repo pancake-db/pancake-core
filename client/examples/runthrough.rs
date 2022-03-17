@@ -9,7 +9,7 @@ use pancake_db_idl::dtype::DataType;
 use pancake_db_idl::partition_dtype::PartitionDataType;
 use pancake_db_idl::schema::{ColumnMeta, PartitionMeta, Schema};
 use protobuf::{MessageField, ProtobufEnumOrUnknown};
-use rand::Rng;
+use rand::{Rng, thread_rng};
 use tokio;
 
 use pancake_db_client::{Client, make_partition, make_row, SegmentKey};
@@ -87,23 +87,22 @@ async fn main() -> ClientResult<()> {
   // limit the number of concurrent write futures
   // server configuration might limit this and refuse connections after a point
   let max_concurrency = 16;
-  futures::stream::repeat(0).take(1000) // write our 2 rows 1000 times (2000 rows)
+  futures::stream::repeat(0).take(15000) // write our 2 rows 1000 times (2000 rows)
     .for_each_concurrent(
       max_concurrency,
       |_| async {
-        let rows = vec![
-          make_row! {},
-          make_row! {
-            "i" => 33,
-            "s" => vec!["item 0".to_string(), "item 1".to_string()],
-          },
-        ];
-        let mut rng = rand::thread_rng();
+        let mut rows = Vec::with_capacity(255);
+        let mut rng = thread_rng();
+        for _ in 0..255 {
+          rows.push(make_row! {
+            "i" => i64::MAX / rng.gen_range(1..i64::MAX),
+          })
+        }
         let req = WriteToPartitionRequest {
           table_name: TABLE_NAME.to_string(),
           rows,
           partition: make_partition! {
-            "pk" => rng.gen_range(0..N_PARTITIONS)
+            "pk" => 0
           },
           ..Default::default()
         };

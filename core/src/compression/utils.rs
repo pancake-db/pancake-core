@@ -12,13 +12,13 @@ pub fn new_codec(
   codec: &str,
 ) -> CoreResult<Box<dyn ValueCodec>> {
   let maybe_res: Option<Box<dyn ValueCodec>> = match dtype {
-    DataType::STRING => String::new_value_codec(codec),
-    DataType::INT64 => i64::new_value_codec(codec),
-    DataType::BYTES => Vec::<u8>::new_value_codec(codec),
-    DataType::BOOL => bool::new_value_codec(codec),
-    DataType::FLOAT32 => f32::new_value_codec(codec),
-    DataType::FLOAT64 => f64::new_value_codec(codec),
-    DataType::TIMESTAMP_MICROS => TimestampMicros::new_value_codec(codec),
+    DataType::String => String::new_value_codec(codec),
+    DataType::Int64 => i64::new_value_codec(codec),
+    DataType::Bytes => Vec::<u8>::new_value_codec(codec),
+    DataType::Bool => bool::new_value_codec(codec),
+    DataType::Float32 => f32::new_value_codec(codec),
+    DataType::Float64 => f64::new_value_codec(codec),
+    DataType::TimestampMicros => TimestampMicros::new_value_codec(codec),
   };
 
   match maybe_res {
@@ -33,13 +33,13 @@ pub fn new_codec(
 
 pub fn choose_codec(dtype: DataType) -> String {
   match dtype {
-    DataType::INT64 => Q_COMPRESS.to_string(),
-    DataType::STRING => ZSTD.to_string(),
-    DataType::BYTES => ZSTD.to_string(),
-    DataType::FLOAT32 => Q_COMPRESS.to_string(),
-    DataType::FLOAT64 => Q_COMPRESS.to_string(),
-    DataType::BOOL => Q_COMPRESS.to_string(),
-    DataType::TIMESTAMP_MICROS => Q_COMPRESS.to_string(),
+    DataType::Int64 => Q_COMPRESS.to_string(),
+    DataType::String => ZSTD.to_string(),
+    DataType::Bytes => ZSTD.to_string(),
+    DataType::Float32 => Q_COMPRESS.to_string(),
+    DataType::Float64 => Q_COMPRESS.to_string(),
+    DataType::Bool => Q_COMPRESS.to_string(),
+    DataType::TimestampMicros => Q_COMPRESS.to_string(),
   }
 }
 

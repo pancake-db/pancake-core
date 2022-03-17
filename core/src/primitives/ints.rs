@@ -22,20 +22,20 @@ impl Atom for i64 {
 }
 
 impl Primitive for i64 {
-  const DTYPE: DataType = DataType::INT64;
+  type A = Self;
+  const DTYPE: DataType = DataType::Int64;
+
   const IS_ATOMIC: bool = true;
 
-  type A = Self;
+  fn to_value(&self) -> Value {
+    Value::Int64Val(*self)
+  }
 
   fn try_from_value(v: &Value) -> CoreResult<i64> {
     match v {
-      Value::int64_val(res) => Ok(*res),
+      Value::Int64Val(res) => Ok(*res),
       _ => Err(CoreError::invalid("cannot read i64 from value")),
     }
-  }
-
-  fn to_value(&self) -> Value {
-    Value::int64_val(*self)
   }
 
   fn to_atoms(&self) -> Vec<Self> {

@@ -8,20 +8,20 @@ use crate::errors::{CoreError, CoreResult};
 use crate::primitives::Primitive;
 
 impl Primitive for String {
-  const DTYPE: DataType = DataType::STRING;
+  type A = u8;
+  const DTYPE: DataType = DataType::String;
+
   const IS_ATOMIC: bool = false;
 
-  type A = u8;
+  fn to_value(&self) -> Value {
+    Value::StringVal(self.clone())
+  }
 
   fn try_from_value(v: &Value) -> CoreResult<String> {
     match v {
-      Value::string_val(res) => Ok(res.clone()),
+      Value::StringVal(res) => Ok(res.clone()),
       _ => Err(CoreError::invalid("unable to extract string from value"))
     }
-  }
-
-  fn to_value(&self) -> Value {
-    Value::string_val(self.clone())
   }
 
   fn to_atoms(&self) -> Vec<u8> {
@@ -52,8 +52,7 @@ mod tests {
     let strs = vec!["orange", "banana", "grapefruit", "ÿ\\'\""];
     let fvs = strs.iter()
       .map(|s| FieldValue {
-        value: Some(Value::string_val(s.to_string())),
-        ..Default::default()
+        value: Some(Value::StringVal(s.to_string())),
       })
       .collect::<Vec<FieldValue>>();
 

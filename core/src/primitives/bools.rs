@@ -27,20 +27,20 @@ impl Atom for bool {
 }
 
 impl Primitive for bool {
-  const DTYPE: DataType = DataType::BOOL;
+  type A = Self;
+  const DTYPE: DataType = DataType::Bool;
+
   const IS_ATOMIC: bool = true;
 
-  type A = Self;
+  fn to_value(&self) -> Value {
+    Value::BoolVal(*self)
+  }
 
   fn try_from_value(v: &Value) -> CoreResult<bool> {
     match v {
-      Value::bool_val(res) => Ok(*res),
+      Value::BoolVal(res) => Ok(*res),
       _ => Err(CoreError::invalid("cannot read bool from value")),
     }
-  }
-
-  fn to_value(&self) -> Value {
-    Value::bool_val(*self)
   }
 
   fn to_atoms(&self) -> Vec<Self> {

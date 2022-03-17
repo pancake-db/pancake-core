@@ -52,7 +52,7 @@ pub fn extract_single_levels_and_atoms<P: Primitive>(
         atoms: vec![],
       })
     },
-    Some(Value::list_val(repeated)) => {
+    Some(Value::ListVal(repeated)) => {
       if traverse_depth >= schema_depth {
         return Err(CoreError::invalid("traversed to deeper than schema depth"));
       }
@@ -132,7 +132,7 @@ impl<P: Primitive> AtomNester<P> {
     if traverse_depth == 0 && level == 0 {
       //null
       self.i += 1;
-      Ok(FieldValue::new())
+      Ok(FieldValue::default())
     } else if traverse_depth < self.schema_depth {
       //list
       let mut res = Vec::new();
@@ -145,11 +145,9 @@ impl<P: Primitive> AtomNester<P> {
         self.i += 1;
       }
       Ok(FieldValue {
-        value: Some(Value::list_val(RepeatedFieldValue {
+        value: Some(Value::ListVal(RepeatedFieldValue {
           vals: res,
-          ..Default::default()
         })),
-        ..Default::default()
       })
     } else if traverse_depth == self.schema_depth {
       let start = self.j;
@@ -168,7 +166,6 @@ impl<P: Primitive> AtomNester<P> {
       let value = P::try_from_atoms(atoms)?.to_value();
       Ok(FieldValue {
         value: Some(value),
-        ..Default::default()
       })
     } else {
       Err(CoreError::corrupt("invalid repetition level found"))
