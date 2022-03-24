@@ -3,11 +3,11 @@ use std::fmt::{Display, Formatter};
 use std::string::FromUtf8Error;
 
 use tonic::{Code, Status};
-use pancake_db_core::errors::CoreError;
 
 trait OtherUpcastable: std::error::Error {}
 impl OtherUpcastable for FromUtf8Error {}
-impl OtherUpcastable for CoreError {}
+#[cfg(feature = "read")]
+impl OtherUpcastable for pancake_db_core::errors::CoreError {}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClientError {

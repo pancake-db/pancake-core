@@ -478,7 +478,7 @@ checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
 
 [[package]]
 name = "pancake-db-client"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "futures",
  "pancake-db-core",
@@ -494,7 +494,7 @@ dependencies = [
 
 [[package]]
 name = "pancake-db-core"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "pancake-db-idl",
  "prost-types",
@@ -660,9 +660,9 @@ dependencies = [
 
 [[package]]
 name = "q_compress"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95e8bd2f301b27c44c2bef1302168bc400c6fe530ed0355cf04501e34bbe256b"
+checksum = "3dd92d0a3e31e816030c5b7bf765ba53ae22b9346347e5cece9eaacd448d87aa"
 
 [[package]]
 name = "quote"

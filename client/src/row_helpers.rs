@@ -1,9 +1,11 @@
 use std::time::SystemTime;
-/// Re-export for the purpose of [`make_row`].
-pub use pancake_db_idl::dml::{FieldValue, Row};
+
 use pancake_db_idl::dml::field_value::Value;
 use pancake_db_idl::dml::RepeatedFieldValue;
 use prost_types::Timestamp;
+
+/// Re-export for the purpose of [`make_row`].
+pub use pancake_db_idl::dml::{FieldValue, Row};
 
 /// Trait used by [`make_row`] to convert native types to Pancake IDL types.
 pub trait FieldValueConverter {

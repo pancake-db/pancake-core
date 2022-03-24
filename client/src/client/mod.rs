@@ -6,6 +6,7 @@ use tonic::transport::Channel;
 
 use crate::errors::ClientResult;
 
+#[cfg(feature = "read")]
 mod read;
 
 /// The best way to communicate with a PancakeDB server from Rust.
@@ -26,6 +27,11 @@ mod read;
 /// ```
 #[derive(Clone, Debug)]
 pub struct Client {
+  /// The generated Tonic GRPC client.
+  ///
+  /// All client calls ultimately go through this.
+  /// You can manually make low-level calls like `read_segment_columns` through
+  /// this GRPC client.
   pub grpc: PancakeDbClient<Channel>,
 }
 
@@ -82,15 +88,6 @@ impl Client {
   /// filter.
   pub async fn list_segments(&mut self, req: ListSegmentsRequest) -> ClientResult<ListSegmentsResponse> {
     let resp = self.grpc.list_segments(req).await?.into_inner();
-    Ok(resp)
-  }
-
-  /// Reads the binary data for a single column of a single segment.
-  ///
-  /// Uncommonly used; you should typically use
-  /// [`Client::decode_segment`] instead.
-  pub async fn read_segment_column(&mut self, req: ReadSegmentColumnRequest) -> ClientResult<ReadSegmentColumnResponse> {
-    let resp = self.grpc.read_segment_column(req).await?.into_inner();
     Ok(resp)
   }
 

@@ -1,8 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
 use futures::StreamExt;
-use pancake_db_client::{Client, SegmentKey};
-use pancake_db_client::errors::{ClientError, ClientResult, ClientErrorKind};
 use pancake_db_idl::ddl::{AlterTableRequest, CreateTableRequest, DropTableRequest, GetSchemaRequest};
 use pancake_db_idl::ddl::create_table_request::SchemaMode;
 use pancake_db_idl::dml::{DeleteFromSegmentRequest, FieldValue, ListSegmentsRequest, Row, WriteToPartitionRequest};
@@ -14,6 +12,9 @@ use structopt::StructOpt;
 use tokio;
 use tokio::time::Duration;
 use tonic::Code;
+
+use pancake_db_client::{Client, SegmentKey};
+use pancake_db_client::errors::{ClientError, ClientErrorKind, ClientResult};
 
 const TABLE_NAME: &str = "fuzz_test_table";
 const BATCH_SIZE: usize = 250;
