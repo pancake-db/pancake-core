@@ -139,6 +139,7 @@ async fn main() -> ClientResult<()> {
   // Read segments
   let mut total = 0;
   for segment in &list_resp.segments {
+    println!("\npartition {:?} segment {:?}", segment.partition, segment.segment_id);
     let segment_key = SegmentKey {
       table_name: TABLE_NAME.to_string(),
       segment_id: segment.segment_id.clone(),
@@ -152,9 +153,10 @@ async fn main() -> ClientResult<()> {
     let count = rows.len();
     total += count;
     println!("read segment {} with {} rows (total {})", segment.segment_id, count, total);
-    for i in 0..10 {
+    for i in 0..5 {
       println!("\t{}th row: {:?}", i, rows[i].clone());
     }
+    println!("\t...");
   }
 
   Ok(())
