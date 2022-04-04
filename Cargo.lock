@@ -481,7 +481,7 @@ name = "pancake-db-client"
 version = "0.2.0"
 dependencies = [
  "futures",
- "pancake-db-core",
+ "pancake-db-core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pancake-db-idl",
  "prost-types",
  "rand",
@@ -495,6 +495,18 @@ dependencies = [
 [[package]]
 name = "pancake-db-core"
 version = "0.2.0"
+dependencies = [
+ "pancake-db-idl",
+ "prost-types",
+ "q_compress",
+ "zstd",
+]
+
+[[package]]
+name = "pancake-db-core"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8308c9f13369d6c4b61daac550fda3cfb65763297b63ce51642495ee17f71520"
 dependencies = [
  "pancake-db-idl",
  "prost-types",
