@@ -1,19 +1,16 @@
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr};
 
 use futures::StreamExt;
-use hyper::StatusCode;
+use pancake_db_client::{Client, make_partition, make_row, SegmentKey};
+use pancake_db_client::errors::{ClientResult, ClientErrorKind};
 use pancake_db_idl::ddl::{CreateTableRequest, DropTableRequest, GetSchemaRequest};
 use pancake_db_idl::dml::{DeleteFromSegmentRequest, ListSegmentsRequest, Segment, WriteToPartitionRequest};
 use pancake_db_idl::dtype::DataType;
 use pancake_db_idl::partition_dtype::PartitionDataType;
 use pancake_db_idl::schema::{ColumnMeta, PartitionMeta, Schema};
-use protobuf::{MessageField, ProtobufEnumOrUnknown};
-use rand::Rng;
+use rand::{Rng, thread_rng};
 use tokio;
-
-use pancake_db_client::{Client, make_partition, make_row, SegmentKey};
-use pancake_db_client::errors::{ClientErrorKind, ClientResult};
+use tonic::Code;
 
 const TABLE_NAME: &str = "client_runthrough_table";
 const N_PARTITIONS: i64 = 3;
@@ -21,13 +18,10 @@ const N_PARTITIONS: i64 = 3;
 #[tokio::main]
 async fn main() -> ClientResult<()> {
   // Instantiate a client
-  let client = Client::from_ip_port(
-    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-    3841,
-  );
+  let mut client = Client::connect("http://localhost:3842").await?;
 
   // Drop table (if it exists)
-  let drop_table_res = client.api_drop_table(&DropTableRequest {
+  let drop_table_res = client.drop_table(DropTableRequest {
     table_name: TABLE_NAME.to_string(),
     ..Default::default()
   }).await;
@@ -38,7 +32,7 @@ async fn main() -> ClientResult<()> {
     },
     Err(err) => {
       match err.kind {
-        ClientErrorKind::Http(StatusCode::NOT_FOUND) => Ok(()),
+        ClientErrorKind::Grpc { code: Code::NotFound } => Ok(()),
         _ => Err(err),
       }
     }
@@ -46,11 +40,11 @@ async fn main() -> ClientResult<()> {
 
   // Create a table
   let i_meta = ColumnMeta {
-    dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
+    dtype: DataType::Int64 as i32,
     ..Default::default()
   };
   let s_meta = ColumnMeta {
-    dtype: ProtobufEnumOrUnknown::new(DataType::STRING),
+    dtype: DataType::String as i32,
     nested_list_depth: 1,
     ..Default::default()
   };
@@ -59,26 +53,26 @@ async fn main() -> ClientResult<()> {
   columns.insert("s".to_string(), s_meta);
   let mut partitioning = HashMap::new();
   partitioning.insert("pk".to_string(), PartitionMeta {
-    dtype: ProtobufEnumOrUnknown::new(PartitionDataType::INT64),
+    dtype: PartitionDataType::Int64 as i32,
     ..Default::default()
   });
   let create_table_req = CreateTableRequest {
     table_name: TABLE_NAME.to_string(),
-    schema: MessageField::some(Schema {
+    schema: Some(Schema {
       partitioning,
       columns: columns.clone(),
       ..Default::default()
     }),
     ..Default::default()
   };
-  let create_resp = client.api_create_table(&create_table_req).await?;
+  let create_resp = client.create_table(create_table_req).await?;
   println!("Created table: {:?}", create_resp);
 
   let get_schema_req = GetSchemaRequest {
     table_name: TABLE_NAME.to_string(),
     ..Default::default()
   };
-  let get_schema_resp = client.api_get_schema(&get_schema_req).await?;
+  let get_schema_resp = client.get_schema(get_schema_req).await?;
   println!("Got schema: {:?}", get_schema_resp);
 
   // Write rows
@@ -87,18 +81,19 @@ async fn main() -> ClientResult<()> {
   // limit the number of concurrent write futures
   // server configuration might limit this and refuse connections after a point
   let max_concurrency = 16;
-  futures::stream::repeat(0).take(1000) // write our 2 rows 1000 times (2000 rows)
+  futures::stream::repeat(0).take(1000) // write 50 rows 1000 times (50000 rows)
     .for_each_concurrent(
       max_concurrency,
       |_| async {
-        let rows = vec![
-          make_row! {},
-          make_row! {
-            "i" => 33,
+        let mut rows = Vec::with_capacity(255);
+        let mut rng = thread_rng();
+        for _ in 0..49 {
+          rows.push(make_row! {
+            "i" => i64::MAX / rng.gen_range(1..i64::MAX),
             "s" => vec!["item 0".to_string(), "item 1".to_string()],
-          },
-        ];
-        let mut rng = rand::thread_rng();
+          })
+        }
+        rows.push(make_row! {});
         let req = WriteToPartitionRequest {
           table_name: TABLE_NAME.to_string(),
           rows,
@@ -107,7 +102,7 @@ async fn main() -> ClientResult<()> {
           },
           ..Default::default()
         };
-        client.api_write_to_partition(&req).await.expect("write failed");
+        client.clone().write_to_partition(req).await.expect("write failed");
       }
     )
     .await;
@@ -117,7 +112,7 @@ async fn main() -> ClientResult<()> {
     table_name: TABLE_NAME.to_string(),
     ..Default::default()
   };
-  let list_resp = client.api_list_segments(&list_segments_req).await?;
+  let list_resp = client.list_segments(list_segments_req).await?;
   println!("Listed segments: {:?}", list_resp);
 
   // Delete from segment
@@ -130,20 +125,21 @@ async fn main() -> ClientResult<()> {
     row_ids: vec![0, 4, 10],
     ..Default::default()
   };
-  let delete_resp = client.api_delete_from_segment(&delete_req).await?;
+  let delete_resp = client.delete_from_segment(delete_req.clone()).await?;
   println!("Deleted rows from segment {}: {:?}", segment_id, delete_resp);
-  let delete_resp = client.api_delete_from_segment(&delete_req).await?;
+  let delete_resp = client.delete_from_segment(delete_req).await?;
   println!("Idempotently deleted same rows again: {:?}", delete_resp);
 
   let mut read_columns = columns;
   read_columns.insert("_row_id".to_string(), ColumnMeta {
-    dtype: ProtobufEnumOrUnknown::new(DataType::INT64),
+    dtype: DataType::Int64 as i32,
     ..Default::default()
   });
 
   // Read segments
   let mut total = 0;
   for segment in &list_resp.segments {
+    println!("\npartition {:?} segment {:?}", segment.partition, segment.segment_id);
     let segment_key = SegmentKey {
       table_name: TABLE_NAME.to_string(),
       segment_id: segment.segment_id.clone(),
@@ -157,9 +153,10 @@ async fn main() -> ClientResult<()> {
     let count = rows.len();
     total += count;
     println!("read segment {} with {} rows (total {})", segment.segment_id, count, total);
-    for i in 0..10 {
+    for i in 0..5 {
       println!("\t{}th row: {:?}", i, rows[i].clone());
     }
+    println!("\t...");
   }
 
   Ok(())

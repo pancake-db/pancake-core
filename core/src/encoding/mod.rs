@@ -33,37 +33,37 @@ fn byte_idx_decoder_for<P: Primitive>(nested_list_depth: u8) -> Box<dyn Decoder<
 
 pub fn new_encoder(dtype: DataType, nested_list_depth: u8) -> Box<dyn Encoder> {
   match dtype {
-    DataType::INT64 => encoder_for::<i64>(nested_list_depth),
-    DataType::STRING => encoder_for::<String>(nested_list_depth),
-    DataType::FLOAT32 => encoder_for::<f32>(nested_list_depth),
-    DataType::FLOAT64 => encoder_for::<f64>(nested_list_depth),
-    DataType::BYTES => encoder_for::<Vec<u8>>(nested_list_depth),
-    DataType::BOOL => encoder_for::<bool>(nested_list_depth),
-    DataType::TIMESTAMP_MICROS => encoder_for::<TimestampMicros>(nested_list_depth),
+    DataType::Int64 => encoder_for::<i64>(nested_list_depth),
+    DataType::String => encoder_for::<String>(nested_list_depth),
+    DataType::Float32 => encoder_for::<f32>(nested_list_depth),
+    DataType::Float64 => encoder_for::<f64>(nested_list_depth),
+    DataType::Bytes => encoder_for::<Vec<u8>>(nested_list_depth),
+    DataType::Bool => encoder_for::<bool>(nested_list_depth),
+    DataType::TimestampMicros => encoder_for::<TimestampMicros>(nested_list_depth),
   }
 }
 
 pub fn new_field_value_decoder(dtype: DataType, nested_list_depth: u8) -> Box<dyn Decoder<FieldValue>> {
   match dtype {
-    DataType::INT64 => field_value_decoder_for::<i64>(nested_list_depth),
-    DataType::STRING => field_value_decoder_for::<String>(nested_list_depth),
-    DataType::FLOAT32 => field_value_decoder_for::<f32>(nested_list_depth),
-    DataType::FLOAT64 => field_value_decoder_for::<f64>(nested_list_depth),
-    DataType::BYTES => field_value_decoder_for::<Vec<u8>>(nested_list_depth),
-    DataType::BOOL => field_value_decoder_for::<bool>(nested_list_depth),
-    DataType::TIMESTAMP_MICROS => field_value_decoder_for::<TimestampMicros>(nested_list_depth),
+    DataType::Int64 => field_value_decoder_for::<i64>(nested_list_depth),
+    DataType::String => field_value_decoder_for::<String>(nested_list_depth),
+    DataType::Float32 => field_value_decoder_for::<f32>(nested_list_depth),
+    DataType::Float64 => field_value_decoder_for::<f64>(nested_list_depth),
+    DataType::Bytes => field_value_decoder_for::<Vec<u8>>(nested_list_depth),
+    DataType::Bool => field_value_decoder_for::<bool>(nested_list_depth),
+    DataType::TimestampMicros => field_value_decoder_for::<TimestampMicros>(nested_list_depth),
   }
 }
 
 pub fn new_byte_idx_decoder(dtype: DataType, nested_list_depth: u8) -> Box<dyn Decoder<ByteIdx>> {
   match dtype {
-    DataType::INT64 => byte_idx_decoder_for::<i64>(nested_list_depth),
-    DataType::STRING => byte_idx_decoder_for::<String>(nested_list_depth),
-    DataType::FLOAT32 => byte_idx_decoder_for::<f32>(nested_list_depth),
-    DataType::FLOAT64 => byte_idx_decoder_for::<f64>(nested_list_depth),
-    DataType::BYTES => byte_idx_decoder_for::<Vec<u8>>(nested_list_depth),
-    DataType::BOOL => byte_idx_decoder_for::<bool>(nested_list_depth),
-    DataType::TIMESTAMP_MICROS => byte_idx_decoder_for::<TimestampMicros>(nested_list_depth),
+    DataType::Int64 => byte_idx_decoder_for::<i64>(nested_list_depth),
+    DataType::String => byte_idx_decoder_for::<String>(nested_list_depth),
+    DataType::Float32 => byte_idx_decoder_for::<f32>(nested_list_depth),
+    DataType::Float64 => byte_idx_decoder_for::<f64>(nested_list_depth),
+    DataType::Bytes => byte_idx_decoder_for::<Vec<u8>>(nested_list_depth),
+    DataType::Bool => byte_idx_decoder_for::<bool>(nested_list_depth),
+    DataType::TimestampMicros => byte_idx_decoder_for::<TimestampMicros>(nested_list_depth),
   }
 }
 
@@ -79,12 +79,10 @@ mod tests {
   use crate::rep_levels::RepLevelsAndAtoms;
 
   fn build_list_val(l: Vec<Value>) -> Value {
-    Value::list_val(RepeatedFieldValue {
+    Value::ListVal(RepeatedFieldValue {
       vals: l.iter().map(|x| FieldValue {
         value: Some(x.clone()),
-        ..Default::default()
       }).collect(),
-      ..Default::default()
     })
   }
 
@@ -109,15 +107,17 @@ mod tests {
 
     let values = bytess.iter()
       .map(|maybe_bytes| FieldValue {
-        value: maybe_bytes.as_ref().map(|bytes| Value::bytes_val(bytes.to_vec())),
-        ..Default::default()
+        value: maybe_bytes.as_ref().map(|bytes| Value::BytesVal(bytes.to_vec())),
       })
       .collect::<Vec<FieldValue>>();
 
     let encoded = encode::<Vec<u8>>(&values, 0)?;
     let decoded = decode::<Vec<u8>>(&encoded, 0)?;
     let recovered = decoded.iter()
-      .map(|fv| if fv.has_bytes_val() {Some(fv.get_bytes_val().to_vec())} else {None})
+      .map(|fv| fv.value.as_ref().map(|v| match v {
+        Value::BytesVal(b) => b.clone(),
+        _ => panic!(),
+      }))
       .collect::<Vec<Option<Vec<u8>>>>();
 
     assert_eq!(recovered, bytess);
@@ -136,15 +136,17 @@ mod tests {
 
     let values = ints.iter()
       .map(|maybe_x| FieldValue {
-        value: maybe_x.map(|x| Value::int64_val(x)),
-        ..Default::default()
+        value: maybe_x.map(|x| Value::Int64Val(x)),
       })
       .collect::<Vec<FieldValue>>();
 
     let encoded = encode::<i64>(&values, 0)?;
     let decoded = decode::<i64>(&encoded, 0)?;
     let recovered = decoded.iter()
-      .map(|fv| if fv.has_int64_val() {Some(fv.get_int64_val())} else {None})
+      .map(|fv| fv.value.as_ref().map(|v| match v {
+        Value::Int64Val(x) => *x,
+        _ => panic!(),
+      }))
       .collect::<Vec<Option<i64>>>();
 
     assert_eq!(recovered, ints);
@@ -172,30 +174,29 @@ mod tests {
       .map(|maybe_x| FieldValue {
         value: maybe_x.as_ref().map(|x0| build_list_val(
           x0.iter().map(|x1| build_list_val(
-            x1.iter().map(|x2| Value::string_val(x2.to_string())).collect()
+            x1.iter().map(|x2| Value::StringVal(x2.to_string())).collect()
           )).collect()
         )),
-        ..Default::default()
       })
       .collect::<Vec<FieldValue>>();
 
     let encoded = encode::<String>(&values, 2)?;
     let decoded = decode::<String>(&encoded, 2)?;
     let recovered = decoded.iter()
-      .map(|fv| if fv.has_list_val() {
-        Some(fv.get_list_val()
-          .vals
-          .iter()
-          .map(|x1| x1.get_list_val()
-            .vals
-            .iter()
-            .map(|x2| x2.get_string_val().to_string())
-            .collect())
-          .collect()
-        )
-      } else {
-        None
-      })
+      .map(|fv| fv.value.as_ref().map(|v| match v {
+        Value::ListVal(RepeatedFieldValue { vals }) => vals.iter()
+          .map(|fv| match fv.value.as_ref().unwrap() {
+            Value::ListVal(RepeatedFieldValue { vals }) => vals.iter()
+              .map(|fv| match fv.value.as_ref().unwrap() {
+                Value::StringVal(s) => s.to_string(),
+                _ => panic!(),
+              })
+              .collect(),
+            _ => panic!()
+          })
+          .collect(),
+        _ => panic!()
+      }))
       .collect::<Vec<Option<Vec<Vec<String>>>>>();
 
     assert_eq!(recovered, strings);
@@ -220,9 +221,8 @@ mod tests {
     let values = strings.iter()
       .map(|maybe_x| FieldValue {
         value: maybe_x.as_ref().map(|x0| build_list_val(
-          x0.iter().map(|x1| Value::string_val(x1.to_string())).collect()
+          x0.iter().map(|x1| Value::StringVal(x1.to_string())).collect()
         )),
-        ..Default::default()
       })
       .collect::<Vec<FieldValue>>();
 

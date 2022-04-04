@@ -20,20 +20,20 @@ impl Atom for u8 {
 }
 
 impl Primitive for Vec<u8> {
-  const DTYPE: DataType = DataType::BYTES;
+  type A = u8;
+  const DTYPE: DataType = DataType::Bytes;
+
   const IS_ATOMIC: bool = false;
 
-  type A = u8;
+  fn to_value(&self) -> Value {
+    Value::BytesVal(self.clone())
+  }
 
   fn try_from_value(v: &Value) -> CoreResult<Vec<u8>> {
     match v {
-      Value::bytes_val(res) => Ok(res.clone()),
+      Value::BytesVal(res) => Ok(res.clone()),
       _ => Err(CoreError::invalid("unable to extract string from value"))
     }
-  }
-
-  fn to_value(&self) -> Value {
-    Value::bytes_val(self.clone())
   }
 
   fn to_atoms(&self) -> Vec<u8> {

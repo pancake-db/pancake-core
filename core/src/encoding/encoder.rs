@@ -85,7 +85,7 @@ impl<P: Primitive> EncoderImpl<P> {
       }
     } else {
       match v {
-        Value::list_val(l) => {
+        Value::ListVal(l) => {
           let mut res = Vec::new();
           res.extend(escape_bytes(&(l.vals.len() as u16).to_be_bytes()));
           for val in &l.vals {

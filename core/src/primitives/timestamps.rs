@@ -1,7 +1,9 @@
+use std::time::SystemTime;
 use pancake_db_idl::dml::field_value::Value;
 use pancake_db_idl::dtype::DataType;
-use protobuf::well_known_types::Timestamp;
 use q_compress::data_types::{NumberLike, TimestampMicros};
+
+use prost_types::Timestamp;
 
 use crate::compression::Codec;
 use crate::compression::q_codec::TimestampMicrosQCodec;
@@ -23,21 +25,21 @@ impl Atom for TimestampMicros {
 
 impl Primitive for TimestampMicros {
   type A = Self;
-  const DTYPE: DataType = DataType::TIMESTAMP_MICROS;
+  const DTYPE: DataType = DataType::TimestampMicros;
 
   const IS_ATOMIC: bool = true;
 
   fn to_value(&self) -> Value {
-    let mut t = Timestamp::new();
+    let mut t = Timestamp::from(SystemTime::now());
     let (secs, nanos) = self.to_secs_and_nanos();
     t.seconds = secs;
     t.nanos = nanos as i32;
-    Value::timestamp_val(t)
+    Value::TimestampVal(t)
   }
 
   fn try_from_value(v: &Value) -> CoreResult<TimestampMicros> {
     match v {
-      Value::timestamp_val(res) => Ok(TimestampMicros::from_secs_and_nanos(res.seconds, res.nanos as u32)),
+      Value::TimestampVal(res) => Ok(TimestampMicros::from_secs_and_nanos(res.seconds, res.nanos as u32)),
       _ => Err(CoreError::invalid("cannot read timestamp from value")),
     }
   }

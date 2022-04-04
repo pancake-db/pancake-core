@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use futures::StreamExt;
 use pancake_db_core::compression;
 use pancake_db_core::deletion;
 use pancake_db_core::encoding;
@@ -20,7 +21,7 @@ impl Client {
   /// Typically you'll want to use the higher-level
   /// [`decode_segment`][Client::decode_segment] instead.
   pub async fn decode_is_deleted(
-    &self,
+    &mut self,
     segment_key: &SegmentKey,
     correlation_id: &str,
   ) -> ClientResult<Vec<bool>> {
@@ -35,10 +36,9 @@ impl Client {
       partition: partition.clone(),
       segment_id: segment_id.to_string(),
       correlation_id: correlation_id.to_string(),
-      ..Default::default()
     };
 
-    let resp = self.api_read_segment_deletions(&req).await?;
+    let resp = self.read_segment_deletions(req).await?;
     let bools = deletion::decompress_deletions(&resp.data)?;
     Ok(bools)
   }
@@ -48,7 +48,7 @@ impl Client {
   /// Typically you'll want to use the higher-level
   /// [`decode_segment`][Client::decode_segment] instead.
   pub async fn decode_segment_column(
-    &self,
+    &mut self,
     segment_key: &SegmentKey,
     column_name: &str,
     column: &ColumnMeta,
@@ -60,37 +60,34 @@ impl Client {
       partition,
       segment_id,
     } = segment_key;
-    let mut initial_request = true;
-    let mut continuation_token = "".to_string();
     let mut compressed_bytes = Vec::new();
     let mut uncompressed_bytes = Vec::new();
     let mut codec = "".to_string();
     let mut implicit_nulls_count = 0;
-    while initial_request || !continuation_token.is_empty() {
-      let req = ReadSegmentColumnRequest {
-        table_name: table_name.to_string(),
-        partition: partition.clone(),
-        segment_id: segment_id.to_string(),
-        column_name: column_name.to_string(),
-        correlation_id: correlation_id.to_string(),
-        continuation_token,
-        ..Default::default()
-      };
-      let resp = self.api_read_segment_column(&req).await?;
+    let req = ReadSegmentColumnRequest {
+      table_name: table_name.to_string(),
+      partition: partition.clone(),
+      segment_id: segment_id.to_string(),
+      column_name: column_name.to_string(),
+      correlation_id: correlation_id.to_string(),
+    };
+    let mut read_segment_stream = self.grpc.read_segment_column(req)
+      .await?
+      .into_inner();
+    while let Some(resp_res) = read_segment_stream.next().await {
+      let resp = resp_res?;
       if resp.codec.is_empty() {
         uncompressed_bytes.extend(&resp.data);
       } else {
         compressed_bytes.extend(&resp.data);
         codec = resp.codec.clone();
       }
-      continuation_token = resp.continuation_token;
       implicit_nulls_count = resp.implicit_nulls_count;
-      initial_request = false;
     }
 
     let mut res = Vec::new();
 
-    let dtype = column.dtype.enum_value_or_default();
+    let dtype = column.dtype();
     let mut row_idx = 0;
     if !compressed_bytes.is_empty() {
       if implicit_nulls_count > 0 {
@@ -117,7 +114,7 @@ impl Client {
 
     for _ in 0..implicit_nulls_count {
       if row_idx >= is_deleted.len() || !is_deleted[row_idx] {
-        res.push(FieldValue::new());
+        res.push(FieldValue::default());
       }
       row_idx += 1;
     }
@@ -140,7 +137,7 @@ impl Client {
 
   /// Reads multiple columns for the same segment and applies deletion data.
   pub async fn decode_segment(
-    &self,
+    &mut self,
     segment_key: &SegmentKey,
     columns: &HashMap<String, ColumnMeta>,
   ) -> ClientResult<Vec<Row>> {
@@ -166,7 +163,7 @@ impl Client {
       ).await?;
       n = n.min(fvalues.len());
       for _ in rows.len()..n {
-        rows.push(Row::new());
+        rows.push(Row::default());
       }
       for i in 0..n {
         rows[i].fields.insert(column_name.clone(), fvalues[i].clone());

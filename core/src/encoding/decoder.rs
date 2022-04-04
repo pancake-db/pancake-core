@@ -29,22 +29,19 @@ impl<P: Primitive> Decodable<P> for FieldValue {
     let value = P::try_from_atoms(&atoms)?.to_value();
     Ok(FieldValue {
       value: Some(value),
-      ..Default::default()
     })
   }
 
   fn handle_null(_: usize) -> FieldValue {
-    FieldValue::new()
+    FieldValue::default()
   }
 
   fn combine(outputs: Vec<FieldValue>, _: u8, _: usize) -> FieldValue {
     let repeated = RepeatedFieldValue {
       vals: outputs,
-      ..Default::default()
     };
     FieldValue {
-      value: Some(Value::list_val(repeated)),
-      ..Default::default()
+      value: Some(Value::ListVal(repeated)),
     }
   }
 }

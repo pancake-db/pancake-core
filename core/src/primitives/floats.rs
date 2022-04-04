@@ -36,17 +36,17 @@ impl Atom for f64 {
 
 impl Primitive for f32 {
   type A = Self;
-  const DTYPE: DataType = DataType::FLOAT32;
+  const DTYPE: DataType = DataType::Float32;
 
   const IS_ATOMIC: bool = true;
 
   fn to_value(&self) -> Value {
-    Value::float32_val(*self)
+    Value::Float32Val(*self)
   }
 
   fn try_from_value(v: &Value) -> CoreResult<f32> {
     match v {
-      Value::float32_val(res) => Ok(*res),
+      Value::Float32Val(res) => Ok(*res),
       _ => Err(CoreError::invalid("cannot read f32 from value")),
     }
   }
@@ -70,17 +70,17 @@ impl Primitive for f32 {
 
 impl Primitive for f64 {
   type A = Self;
-  const DTYPE: DataType = DataType::FLOAT64;
+  const DTYPE: DataType = DataType::Float64;
 
   const IS_ATOMIC: bool = true;
 
   fn to_value(&self) -> Value {
-    Value::float64_val(*self)
+    Value::Float64Val(*self)
   }
 
   fn try_from_value(v: &Value) -> CoreResult<f64> {
     match v {
-      Value::float64_val(res) => Ok(*res),
+      Value::Float64Val(res) => Ok(*res),
       _ => Err(CoreError::invalid("cannot read f64 from value")),
     }
   }
